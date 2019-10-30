@@ -203,6 +203,12 @@ class App:
         self.x += self.jx_one * self.move_scale
         self.y += self.jy_one * self.move_scale
 
+        result = self.JudgeDrawLine([self.x, self.y])
+        if len(result) > 0:
+            self.x = self.pre_x
+            self.y = self.pre_y
+            return
+
         self.JudgeLine()
 
         if self.on_line and not self.pre_on_line:
@@ -308,6 +314,7 @@ class App:
                 print('違う')
                 if len(s_result) > 1:
                     # 角から
+                    pass
                 else:
                     if s_result[0][0] == 0:
                         line_x = self.x_border_line[s_result[0][1]]
