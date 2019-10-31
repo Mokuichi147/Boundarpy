@@ -4,6 +4,85 @@ import pyxel
 import pygame
 from pygame import locals
 
+class Controller:
+    def __init__(self):
+        pygame.init()
+        pygame.joystick.init()
+        if pygame.joystick.get_count() == 0:
+            print('controller not found')
+            import sys
+            sys.exit()
+        self.joystick = pygame.joystick.Joystick(0)
+        self.joystick.init()
+
+        self.stick = [0, 0]
+        self.stick_rollover = [0, 0]
+
+        self.down_list = []
+        self.up_list   = []
+        self.button_list = []
+
+    def Update(self):
+        self.down_list.clear()
+        self.up_list.clear()
+
+        for event in pygame.event.get():
+            if event.type == pygame.locals.JOYAXISMOTION:
+                joystick_x = self.joystick.get_axis(0)
+                joystick_y = self.joystick.get_axis(1)
+                joystick_x = 1 if joystick_x > 0 else -1 if joystick_x < 0 else 0
+                joystick_y = 1 if joystick_y > 0 else -1 if joystick_y < 0 else 0
+            elif event.type == pygame.locals.JOYBUTTONDOWN:
+                self.down_list.append(event.button)
+            else:
+                self.up_list.append(event.button)
+
+        self.stick_rollover = [joystick_x, joystick_y]
+        if self.stick_rollover == [0, 0]:
+            self.stick = [0, 0]
+        elif self.stick != [0, 0] and self.stick_rollover != [0, 0]:
+            pass
+        elif self.joystick_x != 0:
+            self.stick = [joystick_x, 0]
+        else:
+            self.stick = [0, joystick_y]
+
+        for down in self.down_list:
+            self.button_list.append(down)
+        for up in self.up_list:
+            self.button_list.remove(up)
+
+
+class Field:
+    def __init__(self, box_size=[10,30, 200,150], player_position=[10, 30]):
+        self.position = player_position
+        self.pre_position = self.position[:]
+        self.box = box_size
+
+        # 描画用: main:[[x],[y]] sub:[[x_y],[y_x]]
+        self.all_line = [self.box[::2], self.box[1::2]]
+        self.all_line_sub = [[self.box[1::2],self.box[1::2]], [self.box[::2],self.box[::2]]]
+
+        # 判定用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]
+        self.border_line = [self.box[::2], self.box[1::2]]
+        self.border_line_sub = [[self.box[1::2],self.box[1::2]], [self.box[::2],self.box[::2]]]
+        self.border_line_normal = [[1, -1], [1, -1]]
+
+        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[d_x],[d_y]]
+        self.creation_line = []
+        self.creation_line_sub = []
+        self.creation_line_normal = []
+        self.creation_line_direction = []
+    
+    def JudgeLine(self, line, line_sub, normal=[0,0], position):
+        result_list = []
+        for num in range(2):
+            for index in [c,l in enumerate(line) if l + normal[num] == position[num]]:
+                if line_sub[num][index] + normal[1-num] <= position[1-num] <= line_sub[num][index] + normal[1-num]:
+                    result_list.append([num, index])
+        return result_list
+
+
 class App:
     def __init__(self):
         pygame.init()
@@ -195,6 +274,11 @@ class App:
             _, [nx, ny], _, _ = self.draw_line[i]
             self.draw_line[i][1] = [nx * -1, ny * -1]
 
+    def NectDirection(self):
+        nx = pos[0] - pre_pos[0]
+        ny = pos[1] - pre_pos[1]
+        
+
     def Update(self):
         self.UpdateController()
 
@@ -312,10 +396,7 @@ class App:
                     self.y_border_line_normal += [line_normal, line_normal]
             else:
                 print('違う')
-                if len(s_result) > 1:
-                    # 角から
-                    pass
-                else:
+                if len(s_result) == 1:
                     if s_result[0][0] == 0:
                         line_x = self.x_border_line[s_result[0][1]]
                         min_y, max_y = self.x_border_line_y[s_result[0][1]]
@@ -337,6 +418,7 @@ class App:
                             end_position = [max_x, line_y]
                         self.y_border_line_x[s_result[0][1]] = line_x
 
+                if len(e_result) == 1:
                     if e_result[0][0] == 0:
                         line_x = self.x_border_line[e_result[0][1]]
                         min_y, max_y = self.x_border_line_y[e_result[0][1]]
