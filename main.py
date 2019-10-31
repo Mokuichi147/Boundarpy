@@ -337,6 +337,21 @@ class App:
                             end_position = [max_x, line_y]
                         self.y_border_line_x[s_result[0][1]] = line_x
 
+                    if e_result[0][0] == 0:
+                        line_x = self.x_border_line[e_result[0][1]]
+                        min_y, max_y = self.x_border_line_y[e_result[0][1]]
+                        if self.draw_line[-1][1][1] == 1:
+                            self.x_border_line_y[e_result[0][1]] = [self.draw_line[-1][3][1], max_y]
+                        else:
+                            self.x_border_line_y[e_result[0][1]] = [self.draw_line[-1][3][1], min_y]
+                    else:
+                        line_y = self.y_border_line[e_result[0][1]]
+                        min_x, max_x = self.y_border_line_x[e_result[0][1]]
+                        if self.draw_line[-1][1][0] == 1:
+                            self.y_border_line_x[e_result[0][1]] = [max_x, self.draw_line[-1][3][0]]
+                        else:
+                            self.y_border_line_x[e_result[0][1]] = [min_x, self.draw_line[-1][3][0]]
+
             for one, [nx,ny], [sx,sy], [ex,ey] in self.draw_line:
                 if one == 2 or one == 4:
                     self.x_border_line.append(sx)
