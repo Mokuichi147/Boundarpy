@@ -51,7 +51,7 @@ class Controller:
             self.stick = [0, 0]
         elif self.stick != [0, 0] and self.stick_rollover != [0, 0]:
             pass
-        elif self.joystick_x != 0:
+        elif joystick_x != 0:
             self.stick = [joystick_x, 0]
         else:
             self.stick = [0, joystick_y]
