@@ -15,6 +15,9 @@ class Controller:
             self.keyboad = False
             self.joystick = pygame.joystick.Joystick(0)
             self.joystick.init()
+        
+        self.joystick_x = 0
+        self.joystick_y = 0
 
         self.stick = [0, 0]
         self.stick_rollover = [0, 0]
@@ -27,15 +30,12 @@ class Controller:
         self.down_list.clear()
         self.up_list.clear()
 
-        joystick_x = 0
-        joystick_y = 0
-
         for event in pygame.event.get():
             if event.type == pygame.locals.JOYAXISMOTION:
-                joystick_x = self.joystick.get_axis(0)
-                joystick_y = self.joystick.get_axis(1)
-                joystick_x = 1 if joystick_x > 0 else -1 if joystick_x < 0 else 0
-                joystick_y = 1 if joystick_y > 0 else -1 if joystick_y < 0 else 0
+                self.joystick_x = self.joystick.get_axis(0)
+                self.joystick_y = self.joystick.get_axis(1)
+                self.joystick_x = 1 if self.joystick_x > 0 else -1 if self.joystick_x < 0 else 0
+                self.joystick_y = 1 if self.joystick_y > 0 else -1 if self.joystick_y < 0 else 0
             elif event.type == pygame.locals.JOYBUTTONDOWN:
                 self.down_list.append(event.button)
             else:
@@ -46,15 +46,15 @@ class Controller:
         for up in self.up_list:
             self.button_list.remove(up)
 
-        self.stick_rollover = [joystick_x, joystick_y]
+        self.stick_rollover = [self.joystick_x, self.joystick_y]
         if self.stick_rollover == [0, 0]:
             self.stick = [0, 0]
         elif self.stick != [0, 0] and self.stick_rollover[0] != 0 and self.stick_rollover[1] != 0:
             pass
         elif self.stick_rollover[0] != 0:
-            self.stick = [joystick_x, 0]
+            self.stick = [self.stick_rollover[0], 0]
         else:
-            self.stick = [0, joystick_y]
+            self.stick = [0, self.stick_rollover[1]]
 
 
 class Field:
@@ -146,10 +146,6 @@ class App:
         self.y = 20
         self.pre_x = self.x
         self.pre_y = self.y
-        self.jx = 0
-        self.jy = 0
-        self.jx_one = 0
-        self.jy_one = 0
 
         self.move_scale = 2
 
