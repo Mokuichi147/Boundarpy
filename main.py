@@ -27,6 +27,9 @@ class Controller:
         self.down_list.clear()
         self.up_list.clear()
 
+        joystick_x = 0
+        joystick_y = 0
+
         for event in pygame.event.get():
             if event.type == pygame.locals.JOYAXISMOTION:
                 joystick_x = self.joystick.get_axis(0)
