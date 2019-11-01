@@ -116,6 +116,12 @@ class Field:
         elif direction == [0, -1]:
             return [1, 0]
     
+    def InversionNormal(self, normal):
+        '''
+        向きを反転させる
+        '''
+        return [[nx*-1, ny*-1] for nx, ny in normal]
+    
     def SearchPosition(self, line, line_sub, line_normal, begin_position, begin_normal, end_position):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
@@ -162,10 +168,6 @@ class App:
         self.pre_y = self.y
 
         self.move_scale = 2
-
-        self.down_list = []
-        self.button_list = []
-        self.up_list = []
 
         self.player_x = 5
         self.player_y = 5
@@ -242,10 +244,10 @@ class App:
 
         for i in count_list:
             one, n, [sx,sy], [ex,ey] = self.draw_line[i]
-            min_x = sx if one != 3 else ex
-            max_x = ex if one != 3 else sx
-            min_y = sy if one != 4 else ey
-            max_y = ey if one != 4 else sy
+            min_x = sx if one != [-1, 0] else ex
+            max_x = ex if one != [-1, 0] else sx
+            min_y = sy if one != [0, -1] else ey
+            max_y = ey if one != [0, -1] else sy
             if normal:
                 min_x += n[0]
                 max_x += n[0]
@@ -297,7 +299,6 @@ class App:
         
 
     def Update(self):
-        #self.UpdateController()
         self.controller.Update()
 
         self.pre_x = self.x
@@ -452,8 +453,8 @@ class App:
                         else:
                             self.y_border_line_x[e_result[0][1]] = [min_x, self.draw_line[-1][3][0]]
 
-            for one, [nx,ny], [sx,sy], [ex,ey] in self.draw_line:
-                if one == 2 or one == 4:
+            for normal, [nx,ny], [sx,sy], [ex,ey] in self.draw_line:
+                if normal == [0, 1] or normal == [0, -1]:
                     self.x_border_line.append(sx)
                     self.x_border_line_y.append([sy, ey] if sy < ey else [ey, sy])
                     self.x_border_line_normal.append(nx)
