@@ -10,10 +10,11 @@ class Controller:
         pygame.joystick.init()
         if pygame.joystick.get_count() == 0:
             print('controller not found')
-            import sys
-            sys.exit()
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
+            self.keyboad = True
+        else:
+            self.keyboad = False
+            self.joystick = pygame.joystick.Joystick(0)
+            self.joystick.init()
 
         self.stick = [0, 0]
         self.stick_rollover = [0, 0]
@@ -36,6 +37,11 @@ class Controller:
                 self.down_list.append(event.button)
             else:
                 self.up_list.append(event.button)
+        
+        for down in self.down_list:
+            self.button_list.append(down)
+        for up in self.up_list:
+            self.button_list.remove(up)
 
         self.stick_rollover = [joystick_x, joystick_y]
         if self.stick_rollover == [0, 0]:
@@ -46,11 +52,6 @@ class Controller:
             self.stick = [joystick_x, 0]
         else:
             self.stick = [0, joystick_y]
-
-        for down in self.down_list:
-            self.button_list.append(down)
-        for up in self.up_list:
-            self.button_list.remove(up)
 
 
 class Field:
@@ -74,24 +75,69 @@ class Field:
         self.creation_line_normal = []
         self.creation_line_direction = []
     
-    def JudgeLine(self, line, line_sub, normal=[0,0], position):
+    def JudgeLine(self, line, line_sub, position, line_normal=[0,0]):
+        '''
+        入力された座標に対して重なっている線の情報を返す
+        return [ [XorY, index], [XorY, index], ...]
+        '''
         result_list = []
         for num in range(2):
-            for index in [c,l in enumerate(line) if l + normal[num] == position[num]]:
-                if line_sub[num][index] + normal[1-num] <= position[1-num] <= line_sub[num][index] + normal[1-num]:
+            for index in [c for c,l in enumerate(line) if l + normal[num] == position[num]]:
+                if line_sub[num][index][0] + normal[1-num] <= position[1-num] <= line_sub[num][index][1] + normal[1-num]:
+                    result_list.append([num, index])
+        # [ [XorY, index], ... ]
+        return result_list
+
+    def JudgeLineCross(self, line_sub, position):
+        '''
+        入力された座標に対して十字上にある線の情報を返す
+        return [ [XorY, index], [XorY, index], ...]
+        '''
+        result_list = []
+        for num in range(2):
+            for index in range(len(line_sub[num])):
+                if line_sub[num][index][0] <= position[1-num] <= line_sub[num][index][1]:
                     result_list.append([num, index])
         return result_list
+    
+    def SearchPosition(self, line, line_sub, line_normal, begin_position, begin_normal, end_position):
+        '''
+        入力された座標が線上を通ってゴール地点まで探索する
+        return 領域を囲う向きが正しいか(Bool: 正しい=True)
+        '''
+        position = begin_position
+        p_normal = begin_normal
+        goal = False
+        while not goal:
+            position_result = self.JudgeLine(line, line_sub, position)
+            if len(position_result) == 4:
+                normal_p_result = self.JudgeLine(line, line_sub, [position[0] + p_normal[0], position[1] + p_normal[1]])
+                result = [i for i in position_result if i == normal_p_result]
+            elif len(position_result) == 3:
+                normal_p_result = self.JudgeLine(line, line_sub, [position[0]])
+            for e_p in end_position:
+                for num, index in [[num,index] for num,index in result if line[num][index] == e_p[num]]:
+                    if line_sub[num][index][0] <= e_p[1-num] <= line_sub[num][index][1]:
+                        # 現在の線にend_positionが有る
+                        goal = True
+            # 次の点を決める
+            xy = result[0]
+            index = result[1]
+            if p_normal == [-1, 0]:
+                position = [line_sub[xy][index][0], line[xy][index]]
+            elif p_normal == [0, -1]:
+                position = [line[xy][index], line_sub[xy][index][1]]
+            elif p_normal == [1, 0]:
+                position = [line_sub[xy][index][0], line[xy][index]]
+            else:
+                position = [line[xy][index], line_sub[xy][index][1]]
+
+        return normal_result
 
 
 class App:
     def __init__(self):
-        pygame.init()
-        pygame.joystick.init()
-        if pygame.joystick.get_count() == 0:
-            print('error')
-            import sys; sys.exit()
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
+        self.controller = Controller()
 
         self.x = 10
         self.y = 20
@@ -149,37 +195,6 @@ class App:
         pyxel.load('assets/main.pyxres')
         pyxel.run(self.Update, self.Draw)
 
-    def UpdateController(self):
-        self.down_list = []
-        self.up_list   = []
-
-        for event in pygame.event.get():
-            if event.type == pygame.locals.JOYAXISMOTION:
-                self.jx = self.joystick.get_axis(0)
-                self.jy = self.joystick.get_axis(1)
-                self.jx = 1 if self.jx > 0 else -1 if self.jx < 0 else 0
-                self.jy = 1 if self.jy > 0 else -1 if self.jy < 0 else 0
-            elif event.type == pygame.locals.JOYBUTTONDOWN:
-                self.down_list.append(event.button)
-            else:
-                self.up_list.append(event.button)
-
-        if self.jx == self.jy == 0:
-            self.j_one = 0
-        elif self.j_one != 0 and self.jx != 0 and self.jy != 0:
-            pass
-        elif self.jx != 0:
-            self.j_one = 1 if self.jx > 0 else 3
-        else:
-            self.j_one = 2 if self.jy > 0 else 4
-        self.jx_one = 1 if self.j_one == 1 else -1 if self.j_one == 3 else 0
-        self.jy_one = 1 if self.j_one == 2 else -1 if self.j_one == 4 else 0
-
-        for down in self.down_list:
-            self.button_list.append(down)
-        for up in self.up_list:
-            self.button_list.remove(up)
-
     def JudgeLine(self):
         self.pre_on_line = self.on_line
         self.on_line = False
@@ -227,17 +242,6 @@ class App:
                 result_list.append(i)
         return result_list
 
-    def CreateNormal(self, one=None):
-        j_one = self.j_one if one == None else one
-        if j_one == 1:
-            return [0, 1]
-        elif j_one == 2:
-            return [-1, 0]
-        elif j_one == 3:
-            return [0, -1]
-        else:
-            return [1, 0]
-
     def TargetVector(self, start, goal, num=False):
         wx = goal[0] - start[0]
         wy = goal[1] - start[1]
@@ -280,12 +284,13 @@ class App:
         
 
     def Update(self):
-        self.UpdateController()
+        #self.UpdateController()
+        self.controller.Update()
 
         self.pre_x = self.x
         self.pre_y = self.y
-        self.x += self.jx_one * self.move_scale
-        self.y += self.jy_one * self.move_scale
+        self.x += self.controller.stick[0] * self.move_scale
+        self.y += self.controller.stick[1] * self.move_scale
 
         result = self.JudgeDrawLine([self.x, self.y])
         if len(result) > 0:
@@ -503,8 +508,8 @@ class App:
         #pyxel.rectb(self.game_box[0], self.game_box[1], self.game_box[2] - self.game_box[0] + 1, self.game_box[3] - self.game_box[1] + 1, self.line_color)
 
         # プレイヤー
-        if len(self.button_list) > 0:
-            self.player_img = 8 + self.button_list[0] * 8 if self.button_list[0] < 4 else 0
+        if len(self.controller.button_list) > 0:
+            self.player_img = 8 + self.controller.button_list[0] * 8 if self.controller.button_list[0] < 4 else 0
         else:
             self.player_img = 0
         pyxel.blt(self.x -2, self.y -2, 0, self.player_img, 0, self.player_x, self.player_y, 0)
