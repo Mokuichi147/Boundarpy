@@ -103,6 +103,19 @@ class Field:
                     result_list.append([num, index])
         return result_list
     
+    def ConvertToNormal(self, direction):
+        '''
+        進行方向から右向きのNormalを返す
+        '''
+        if direction == [1, 0]:
+            return [0, 1]
+        elif direction == [0, 1]:
+            return [-1, 0]
+        elif direction == [-1, 0]:
+            return [0, -1]
+        elif direction == [0, -1]:
+            return [1, 0]
+    
     def SearchPosition(self, line, line_sub, line_normal, begin_position, begin_normal, end_position):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
@@ -141,6 +154,7 @@ class Field:
 class App:
     def __init__(self):
         self.controller = Controller()
+        self.field = Field(box_size=[10,20, 200,150], player_position=[10,20])
 
         self.x = 10
         self.y = 20
@@ -471,15 +485,15 @@ class App:
                     self.on_line = True
                     return
             # 線を引くための情報を追加する
-            self.draw_line.append([self.j_one, self.CreateNormal(), [self.pre_x,self.pre_y], [self.x,self.y]])
+            self.draw_line.append([self.controller.stick, self.filed.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
         
         if self.on_line:
             return
         
-        if self.draw_line[-1][0] == self.j_one:
+        if self.draw_line[-1][0] == self.controller.stick:
             self.draw_line[-1][3] = [self.x, self.y]
-        elif self.j_one != 0:
-            self.draw_line.append([self.j_one, self.CreateNormal(), [self.pre_x,self.pre_y], [self.x,self.y]])
+        elif self.controller.stick != [0, 0]:
+            self.draw_line.append([self.controller.stick, self.filed.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
 
 
     def Draw(self):
