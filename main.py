@@ -485,7 +485,7 @@ class App:
                     self.on_line = True
                     return
             # 線を引くための情報を追加する
-            self.draw_line.append([self.controller.stick, self.filed.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
+            self.draw_line.append([self.controller.stick, self.field.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
         
         if self.on_line:
             return
@@ -493,7 +493,7 @@ class App:
         if self.draw_line[-1][0] == self.controller.stick:
             self.draw_line[-1][3] = [self.x, self.y]
         elif self.controller.stick != [0, 0]:
-            self.draw_line.append([self.controller.stick, self.filed.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
+            self.draw_line.append([self.controller.stick, self.field.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
 
 
     def Draw(self):
