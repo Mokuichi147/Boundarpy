@@ -72,36 +72,143 @@ class Field:
         self.border_line_sub = [[self.box[1::2],self.box[1::2]], [self.box[::2],self.box[::2]]]
         self.border_line_normal = [[1, -1], [1, -1]]
 
-        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[d_x],[d_y]]
-        self.creation_line = []
-        self.creation_line_sub = []
-        self.creation_line_normal = []
+        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[1,0], [0,1], ...] creation:[[b_pos, e_pos], [b_normal, e_normal]]
+        self.creation_line = [[], []]
+        self.creation_line_sub = [[], []]
+        self.creation_line_normal = [[], []]
         self.creation_line_direction = []
+        self.creation = [[0, 0], [[0, 0], [0, 0]]]
     
-    def JudgeLine(self, line, line_sub, position, line_normal=[0,0]):
+    def JudgeLine(self, line, line_sub, position, line_normal=None, normal_scale=1):
         '''
         入力された座標に対して重なっている線の情報を返す
         return [ [XorY, index], [XorY, index], ...]
         '''
         result_list = []
+        if line_normal != None:
+            for num in range(2):
+                for i in range(len(line[num])):
+                    line[num][i] += line_normal[num][i] * normal_scale
         for num in range(2):
-            for index in [c for c,l in enumerate(line) if l + normal[num] == position[num]]:
-                if line_sub[num][index][0] + normal[1-num] <= position[1-num] <= line_sub[num][index][1] + normal[1-num]:
+            for index in [c for c,l in enumerate(line[num]) if l == position[num]]:
+                line_min = line_sub[num][index][0]
+                line_max = line_sub[num][index][1]
+                if line_min <= position[1-num] <= line_max:
                     result_list.append([num, index])
         # [ [XorY, index], ... ]
         return result_list
 
-    def JudgeLineCross(self, line_sub, position):
+    def JudgeLineCross(self, creation, creation_sub, creation_normal, border, border_sub, position):
         '''
-        入力された座標に対して十字上にある線の情報を返す
-        return [ [XorY, index], [XorY, index], ...]
+        十字上に探索する
+        return [探索完了か(bool), [反転させるか or pos]]
+        '''
+        creation_cross_result = self.LineCross(creation, creation_sub, position)
+        creation_cross = self.ConvertToCross(position, creation_cross_result)
+        c_cross = self.NearestCross(creation_cross, position)
+        border_cross_result = self.LineCross(border, border_sub, position)
+        border_cross = self.ConvertToCross(position, border_cross_result)
+        b_cross = self.NearestCross(border_cross, position)
+
+        result = self.ComparsionCross(c_cross, b_cross)
+        if len(result) != 0:
+            normal = result[0]
+            pos = result[1]
+            result_ = self.JudgeLine(creation, creation_sub, pos)
+            for num, index in result_:
+                if creation_normal[num][index] == normal[num]:
+                    return [True, True]
+            return [True, False]
+        return [False, b_cross[0]]
+
+
+    
+    def NearestCross(self, cross, position):
+        '''
+        一番近い点だけにする
+        return [[1,0], [0,1], [-1,0], [0,-1]]
+        '''
+        if len(cross[0]) > 0:
+            nearest = cross[0][0][:]
+            if len(cross[0]) > 1:
+                for pos in cross[0]:
+                    if nearest[0] > pos[0]:
+                        nearest = pos[:]
+            cross[0] = nearest[:]
+        if len(cross[1]) > 0:
+            nearest = cross[1][0][:]
+            if len(cross[1]) > 1:
+                for pos in cross[1]:
+                    if nearest[1] > pos[1]:
+                        nearest = pos[:]
+            cross[1] = nearest[:]
+        if len(cross[2]) > 0:
+            nearest = cross[2][0][:]
+            if len(cross[2]) > 1:
+                for pos in cross[2]:
+                    if nearest[0] < pos[0]:
+                        nearest = pos[:]
+            cross[2] = nearest[:]
+        if len(cross[3]) > 0:
+            nearest = cross[3][0][:]
+            if len(cross[3]) > 1:
+                for pos in cross[3]:
+                    if nearest[1] < pos[1]:
+                        nearest = pos[:]
+            cross[3] = nearest[:]
+        return cross
+
+    def ComparsionCross(self, creation_cross, border_cross):
+        '''
+        return creation_lineのほうが近いか
+        '''
+        if len(creation_cross[0]) != 0:
+            if creation_cross[0][0] <= border_cross[0][0]:
+                return [[1, 0], creation_cross[0]]
+        if len(creation_cross[1]) != 0:
+            if creation_cross[1][1] <= border_cross[1][1]:
+                return [[0, 1], creation_cross[1]]
+        if len(creation_cross[2]) != 0:
+            if creation_cross[2][0] >= border_cross[2][0]:
+                return [[-1, 0], creation_cross[2]]
+        if len(creation_cross[3]) != 0:
+            if creation_cross[3][1] >= border_cross[3][1]:
+                return [[0, -1], creation_cross[3]]
+        return []
+
+    def LineCross(self, line, line_sub, position):
+        '''
+        入力された座標に対して十字上に線があった場合、その座標を返す
+        return [ position, ...]
         '''
         result_list = []
         for num in range(2):
             for index in range(len(line_sub[num])):
                 if line_sub[num][index][0] <= position[1-num] <= line_sub[num][index][1]:
-                    result_list.append([num, index])
+                    pos = [0, 0]
+                    pos[num] = line[num][index]
+                    pos[1-num] = position[1-num]
+                    result_list.append(pos)
         return result_list
+    
+    def ConvertToCross(self, position, cross_position):
+        '''
+        入力された位置に対する方向によって仕分ける
+        return [[1,0], [0,1], [-1,0], [0,-1]]
+        '''
+        result_list = [[], [], [], []]
+        for pos in cross_position:
+            n = self.CreateNormal(position, pos)
+            if n == [1, 0]:
+                result_list[0].append(pos[:])
+            elif n == [0, 1]:
+                result_list[1].append(pos[:])
+            elif n == [-1, 0]:
+                result_list[2].append(pos[:])
+            else:
+                result_list[3].append(pos[:])
+        return result_list
+
     
     def ConvertToNormal(self, direction):
         '''
@@ -116,45 +223,127 @@ class Field:
         elif direction == [0, -1]:
             return [1, 0]
     
+    def CreateNormal(self, begin_position, end_position):
+        '''
+        2点間の方向を返す
+        '''
+        nx = end_position[0] - begin_position[0]
+        ny = end_position[1] - begin_position[1]
+        nx = 0 if nx == 0 else 1 if nx > 0 else -1
+        ny = 0 if ny == 0 else 1 if ny > 0 else -1
+        return [nx, ny]
+    
     def InversionNormal(self, normal):
         '''
         向きを反転させる
         '''
-        return [[nx*-1, ny*-1] for nx, ny in normal]
+        for num in range(2):
+            if len(normal[num]) > 0:
+                for i in range(len(normal[num])):
+                    normal[num][i] *= -1
+        return normal
+
+    def IsInLine(self, line, line_sub, line_info, end_position):
+        '''
+        入力された線上に点があるかを返す
+        return [[end_position](点の位置), ...]
+        '''
+        result_list = []
+        for position in end_position:
+            for xy, index in line_info:
+                if line[xy][index] == position[xy]:
+                    if line_sub[xy][index][0] <= position[1-xy] <= line_sub[xy][index][1]:
+                        result_list.append(position)
+        return result_list
     
-    def SearchPosition(self, line, line_sub, line_normal, begin_position, begin_normal, end_position):
+    def SearchPosition(self, line, line_sub, line_normal, begin_position, end_position, end_normal):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
         return 領域を囲う向きが正しいか(Bool: 正しい=True)
         '''
-        position = begin_position
-        p_normal = begin_normal
-        goal = False
-        while not goal:
-            position_result = self.JudgeLine(line, line_sub, position)
-            if len(position_result) == 4:
-                normal_p_result = self.JudgeLine(line, line_sub, [position[0] + p_normal[0], position[1] + p_normal[1]])
-                result = [i for i in position_result if i == normal_p_result]
-            elif len(position_result) == 3:
-                normal_p_result = self.JudgeLine(line, line_sub, [position[0]])
-            for e_p in end_position:
-                for num, index in [[num,index] for num,index in result if line[num][index] == e_p[num]]:
-                    if line_sub[num][index][0] <= e_p[1-num] <= line_sub[num][index][1]:
-                        # 現在の線にend_positionが有る
-                        goal = True
-            # 次の点を決める
-            xy = result[0]
-            index = result[1]
-            if p_normal == [-1, 0]:
-                position = [line_sub[xy][index][0], line[xy][index]]
-            elif p_normal == [0, -1]:
-                position = [line[xy][index], line_sub[xy][index][1]]
-            elif p_normal == [1, 0]:
-                position = [line_sub[xy][index][0], line[xy][index]]
-            else:
-                position = [line[xy][index], line_sub[xy][index][1]]
+        position_list = [begin_position]
+        pre_lines = []
+        while True:
+            for position in position_list:
+                result_lines = self.JudgeLine(line, line_sub, position)
+                result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
+                if len(result_positions) > 0:
+                    # 発見
+                    for e_pos in result_positions:
+                        nor = self.CreateNormal(position, e_pos)
+                        index = end_position.index(e_pos)
+                        if end_normal[index] == nor:
+                            return False
+                    return True
 
-        return normal_result
+            # 次の点を線から求める
+            next_position_list = []
+            for i in range(len(result_lines)):
+                xy = result_lines[i][0]
+                index = result_lines[i][1]
+                for j in range(2):
+                    position = [0, 0]
+                    position[xy] = line[xy][index]
+                    position[1-xy] = line_sub[xy][index][j]
+                    if not position in position_list:
+                        next_position_list.append(position[:])
+            position_list = next_position_list[:]
+    
+    def Search(self, enemy_position):
+        '''
+        memo: 引数以外に依存している
+        '''
+        cross_result = self.JudgeLineCross(self.creation_line, self.creation_line_sub, self.creation_line_normal, self.border_line, self.border_line_sub, enemy_position)
+        if cross_result[0]:
+            if cross_result[1]:
+                self.creation_line_normal = self.InversionNormal(self.creation_line_normal)
+            return
+
+        search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
+        if not search_pos_result:
+            self.creation_line_normal = self.InversionNormal(self.creation_line_normal)
+        return
+
+    def CreationUpdate(self, controller, position, pre_position):
+        if controller == [0, 0]:
+            return
+        if len(self.creation_line_direction) != 0:
+            if self.creation_line_direction[-1] == controller:
+                if controller == [1, 0]:
+                    self.creation_line_sub[1][-1][1] = position[0]
+                elif controller == [0, 1]:
+                    self.creation_line_sub[0][-1][1] = position[1]
+                elif controller == [-1, 0]:
+                    self.creation_line_sub[1][-1][0] = position[0]
+                elif controller == [0, -1]:
+                    self.creation_line_sub[0][-1][0] = position[1]
+                return
+        self.creation_line_direction.append(controller[:])
+        if controller == [1, 0]:
+            self.creation_line[1].append(position[1])
+            self.creation_line_sub[1].append([pre_position[0], position[0]])
+            self.creation_line_normal[1].append(controller[0])
+        elif controller == [-1, 0]:
+            self.creation_line[1].append(position[1])
+            self.creation_line_sub[1].append([position[0], pre_position[0]])
+            self.creation_line_normal[1].append(controller[0])
+        elif controller == [0, 1]:
+            self.creation_line[0].append(position[0])
+            self.creation_line_sub[0].append([pre_position[1], position[1]])
+            self.creation_line_normal[0].append(controller[1]*-1)
+        else:
+            self.creation_line[0].append(position[0])
+            self.creation_line_sub[0].append([position[1], pre_position[1]])
+            self.creation_line_normal[0].append(controller[1]*-1)
+        return
+    
+    def CreationClear(self):
+        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[1,0], [0,1], ...] creation:[[b_pos, e_pos], [b_normal, e_normal]]
+        self.creation_line = [[], []]
+        self.creation_line_sub = [[], []]
+        self.creation_line_normal = [[], []]
+        self.creation_line_direction = []
+        self.creation = [[0, 0], [[0, 0], [0, 0]]]
 
 
 class App:
@@ -162,6 +351,8 @@ class App:
         self.controller = Controller()
         self.field = Field(box_size=[10,20, 200,150], player_position=[10,20])
 
+        self.pos = [10, 20]
+        self.pre_pos = self.pos[:]
         self.x = 10
         self.y = 20
         self.pre_x = self.x
@@ -293,27 +484,52 @@ class App:
             _, [nx, ny], _, _ = self.draw_line[i]
             self.draw_line[i][1] = [nx * -1, ny * -1]
 
-    def NectDirection(self):
-        nx = pos[0] - pre_pos[0]
-        ny = pos[1] - pre_pos[1]
-        
 
     def Update(self):
         self.controller.Update()
 
-        self.pre_x = self.x
-        self.pre_y = self.y
-        self.x += self.controller.stick[0] * self.move_scale
-        self.y += self.controller.stick[1] * self.move_scale
+        self.pre_pos = self.pos[:]
+        self.pos[0] += self.controller.stick[0] * self.move_scale
+        self.pos[1] += self.controller.stick[1] * self.move_scale
 
-        result = self.JudgeDrawLine([self.x, self.y])
+        result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.pos)
+        #result = self.JudgeDrawLine([self.x, self.y])
         if len(result) > 0:
-            self.x = self.pre_x
-            self.y = self.pre_y
+            self.pos = self.pre_pos[:]
             return
 
-        self.JudgeLine()
+        self.pre_on_line = self.on_line
+        result = self.field.JudgeLine(self.field.border_line, self.field.border_line_sub, self.pos)
+        if len(result) > 0:
+            self.on_line = True
+        else:
+            self.on_line = False
+        #self.JudgeLine()
 
+        if not self.on_line and self.pre_on_line:
+            # 領域外に出たとき
+            result = self.field.JudgeLine(self.field.border_line, self.field.border_line_sub, self.pre_pos)
+            for num, index in result:
+                normal = [0, 0]
+                normal[num] = self.field.border_line_normal[num][index]
+                if normal == self.controller.stick:
+                    self.field.creation[0][0] = self.pos[:]
+                    self.field.creation[1][0] = self.field.ConvertToNormal(self.controller.stick)
+                    self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
+                    return
+            self.pos = self.pre_pos[:]
+            self.on_line = True
+            return
+        elif self.on_line and not self.pre_on_line:
+            self.field.creation[0][1] = self.pos[:]
+            self.field.creation[1][1] = self.field.ConvertToNormal(self.controller.stick)
+            self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
+            self.field.Search(self.enemy_position)
+            self.field.CreationClear()
+        elif not self.on_line and not self.pre_on_line:
+            self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
+
+        """
         if self.on_line and not self.pre_on_line:
             ''' 枠に入ってきたとき '''
             self.draw_line[-1][3] = [self.x, self.y]
@@ -495,6 +711,7 @@ class App:
             self.draw_line[-1][3] = [self.x, self.y]
         elif self.controller.stick != [0, 0]:
             self.draw_line.append([self.controller.stick, self.field.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
+        """
 
 
     def Draw(self):
@@ -503,8 +720,10 @@ class App:
         # 領域の描画
 
         # 現在描き途中の線
-        for line in self.draw_line:
-            pyxel.line(line[2][0],line[2][1], line[3][0],line[3][1], self.line_color_accent)
+        for index in range(len(self.field.creation_line[0])):
+            pyxel.line(self.field.creation_line[0][index], self.field.creation_line_sub[0][index][0], self.field.creation_line[0][index], self.field.creation_line_sub[0][index][1], self.line_color_accent)
+        for index in range(len(self.field.creation_line[1])):
+            pyxel.line(self.field.creation_line_sub[1][index][0], self.field.creation_line[1][index], self.field.creation_line_sub[1][index][1], self.field.creation_line[1][index], self.line_color_accent)
 
         # すべての線
         for x_count in range(len(self.x_all_line)):
@@ -526,7 +745,7 @@ class App:
             self.player_img = 8 + self.controller.button_list[0] * 8 if self.controller.button_list[0] < 4 else 0
         else:
             self.player_img = 0
-        pyxel.blt(self.x -2, self.y -2, 0, self.player_img, 0, self.player_x, self.player_y, 0)
+        pyxel.blt(self.pos[0] -2, self.pos[1] -2, 0, self.player_img, 0, self.player_x, self.player_y, 0)
 
         # 敵
         pyxel.pix(self.enemy_position[0], self.enemy_position[1], 15)
