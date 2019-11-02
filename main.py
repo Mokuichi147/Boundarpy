@@ -2,6 +2,7 @@
 
 import copy
 from random import randint as ri
+from time import time
 import pyxel
 import pygame
 from pygame import locals
@@ -306,7 +307,9 @@ class Field:
         '''
         position_list = [begin_position]
         log = []
-        while True:
+        start_time = time()
+        print(start_time)
+        while 2 > time() - start_time:
             log += copy.deepcopy(position_list)
             next_position_list = []
             for position in position_list:
@@ -316,7 +319,7 @@ class Field:
                     if position in pos:
                         pos.remove(position)
                     if pos in log:
-                        continue
+                        pass
                     if self.GetNormal(line_normal, result_line) == self.CreateNormal(position, pos[0]):
                         next_position_list += pos
                     elif len(result_line) == 3:
@@ -326,6 +329,7 @@ class Field:
                 result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
                 if len(result_positions) > 0:
                     # 発見
+                    print(time() - start_time)
                     if len(result_positions) == 2:
                         e_pos = self.NearestPosition(position, result_positions[0], result_positions[1])
                     else:
@@ -352,6 +356,8 @@ class Field:
                 if pos in next_position_list:
                     next_position_list.remove(pos)
             position_list = next_position_list[:]
+        
+        return None
     
     def Search(self, enemy_position):
         '''
@@ -368,6 +374,8 @@ class Field:
         print('not cross',  cross_result[1])
 
         search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
+        if search_pos_result == None:
+            return 'error'
         if not search_pos_result:
             print('normal')
             self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
@@ -504,6 +512,14 @@ class Field:
 
 class App:
     def __init__(self):
+        self.Clear()
+
+        # MAX: 213x160
+        pyxel.init(210, 160, scale=2, fps=30)
+        pyxel.load('assets/main.pyxres')
+        pyxel.run(self.Update, self.Draw)
+    
+    def Clear(self):
         self.controller = Controller()
         self.field = Field(box_size=[10,30, 200,150], player_position=[10,30])
 
@@ -551,13 +567,27 @@ class App:
         self.on_line_info = []
         self.pre_on_line_info = []
 
-        # MAX: 213x160
-        pyxel.init(210, 160, scale=2, fps=30)
-        pyxel.load('assets/main.pyxres')
-        pyxel.run(self.Update, self.Draw)
+        self.game = True
+        self.game_message = 'CLEAR THE GAME'
+        self.game_count = 0
 
     def Update(self):
         self.controller.Update()
+
+        if 9 in self.controller.up_list:
+            self.Clear()
+            return
+        
+        if not self.game:
+            return
+        
+        if self.enemy_pre_position == self.enemy_position:
+            self.game_count += 1
+            if self.game_count > 5:
+                self.game = False
+                return
+        else:
+            self.game_count = 0
 
         self.pre_pos = self.pos[:]
         self.pos[0] += self.controller.stick[0] * self.move_scale
@@ -572,12 +602,17 @@ class App:
             self.enemy_position = self.enemy_pre_position[:]
             self.enemy_pre_normal = self.enemy_normal[:]
             self.enemy_normal = [0, 0]
-            while self.enemy_normal == [0, 0] or self.enemy_normal == self.enemy_pre_normal:
+            start_time = time()
+            while 2 > time() - start_time and (self.enemy_normal == [0, 0] or self.enemy_normal == self.enemy_pre_normal):
                 self.enemy_normal = [[-2, 0, 2][ri(-1,1)], [-2, 0, 2][ri(-1,1)]]
+            if not 2 > time() - start_time:
+                self.game = False
+                self.game_message = 'GAMEOVER'
+                return
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.enemy_position)
         if len(result) > 0:
-            print('lose')
-            import sys; sys.exit()
+            self.game = False
+            self.game_message = 'GAMEOVER'
             return
 
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.pos)
@@ -611,7 +646,10 @@ class App:
             self.field.creation[0][1] = self.pos[:]
             self.field.creation[1][1] = self.field.ConvertToNormal(self.controller.stick)
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
-            self.field.Search(self.enemy_position)
+            if self.field.Search(self.enemy_position) == 'error':
+                self.game = False
+                self.game_message = 'GAMEOVER'
+                return
             self.field.UpdateAllLine()
             self.field.UpdateBorderLine()
             self.field.CreationClear()
@@ -621,7 +659,19 @@ class App:
 
 
     def Draw(self):
+        if not self.game:
+            if self.game_message == 'GAMEOVER':
+                pyxel.rect(70, 60, 73, 45, 1)
+                pyxel.text(90, 70, self.game_message, 7)
+            else:
+                pyxel.rect(70, 60, 78, 45, 1)
+                pyxel.text(80, 70, self.game_message, 10)
+            pyxel.text(85, 90, 'press START', 7)
+            return
+
         pyxel.cls(0)
+
+        pyxel.text(10, 10, 'RESTART: START Button', 7)
 
         # 領域の描画
 
