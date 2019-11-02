@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import copy
+from random import randint as ri
 import pyxel
 import pygame
 from pygame import locals
@@ -325,15 +326,22 @@ class Field:
                 result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
                 if len(result_positions) > 0:
                     # 発見
-                    print(log)
                     if len(result_positions) == 2:
                         e_pos = self.NearestPosition(position, result_positions[0], result_positions[1])
                     else:
                         e_pos = result_positions[0]
                     nor = self.CreateNormal(position, e_pos)
                     index = end_position.index(e_pos)
+                    print(end_normal[index], nor)
                     if end_normal[index] == nor:
                         return False
+                    line_infos = self.JudgeLine(line, line_sub, e_pos)
+                    for line_info in line_infos:
+                        pos_lis = self.GetPosition(line, line_sub, line_info)
+                        if e_pos in pos_lis:
+                            pos_lis.remove(e_pos)
+                            if end_normal[index] == self.CreateNormal(e_pos, pos_lis[0]):
+                                return False
                     return True
             if next_position_list == []:
                 print('seach position error')
@@ -497,14 +505,10 @@ class Field:
 class App:
     def __init__(self):
         self.controller = Controller()
-        self.field = Field(box_size=[10,20, 200,150], player_position=[10,20])
+        self.field = Field(box_size=[10,30, 200,150], player_position=[10,30])
 
-        self.pos = [10, 20]
+        self.pos = [10, 30]
         self.pre_pos = self.pos[:]
-        self.x = 10
-        self.y = 20
-        self.pre_x = self.x
-        self.pre_y = self.y
 
         self.move_scale = 2
 
@@ -513,6 +517,9 @@ class App:
         self.player_img = 0
 
         self.enemy_position = [170, 40]
+        self.enemy_pre_position = self.enemy_position[:]
+        self.enemy_normal = [[-2, 2][ri(0,1)], [-2, 2][ri(0,1)]]
+        self.enemy_pre_normal = self.enemy_normal[:]
         self.enemy_size = 9
 
         self.game_box = (10,20, 200,150)
@@ -556,8 +563,24 @@ class App:
         self.pos[0] += self.controller.stick[0] * self.move_scale
         self.pos[1] += self.controller.stick[1] * self.move_scale
 
+        self.enemy_pre_position = self.enemy_position[:]
+        self.enemy_position[0] += self.enemy_normal[0]
+        self.enemy_position[1] += self.enemy_normal[1]
+
+        result = self.field.JudgeLine(self.field.border_line, self.field.border_line_sub, self.enemy_position)
+        if len(result) > 0:
+            self.enemy_position = self.enemy_pre_position[:]
+            self.enemy_pre_normal = self.enemy_normal[:]
+            self.enemy_normal = [0, 0]
+            while self.enemy_normal == [0, 0] or self.enemy_normal == self.enemy_pre_normal:
+                self.enemy_normal = [[-2, 0, 2][ri(-1,1)], [-2, 0, 2][ri(-1,1)]]
+        result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.enemy_position)
+        if len(result) > 0:
+            print('lose')
+            import sys; sys.exit()
+            return
+
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.pos)
-        #result = self.JudgeDrawLine([self.x, self.y])
         if len(result) > 0:
             if self.field.creation[0][0] != self.pos:
                 self.pos = self.pre_pos[:]
@@ -569,7 +592,6 @@ class App:
             self.on_line = True
         else:
             self.on_line = False
-        #self.JudgeLine()
 
         if not self.on_line and self.pre_on_line:
             # 領域外に出たとき
@@ -595,106 +617,7 @@ class App:
             self.field.CreationClear()
         elif not self.on_line and not self.pre_on_line:
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
-
-        """
-            # 新しい枠の作成
-            s_result = self.JudgeBorderLine(self.draw_line[0][2])
-            e_result = self.JudgeBorderLine(self.draw_line[-1][3])
-            result_total = [i for i in s_result if i in e_result]
-            # s:self.draw_line[0][2]  g:self.draw_line[-1][3]
-            if len(result_total) > 0:
-                # スタートとゴールが同じ枠からだった場合
-                print('同じ')
-                if result_total[0][0] == 0:
-                    # xが変わらない場合
-                    line_x = self.x_border_line[result_total[0][1]]
-                    line_y_min, line_y_max = self.x_border_line_y[result_total[0][1]]
-                    line_y = []
-                    if self.draw_line[0][1][1] == 1:
-                        line_y.append([self.draw_line[0][2][1], line_y_max])
-                        line_y.append([line_y_min, self.draw_line[-1][3][1]])
-                    else:
-                        line_y.append([self.draw_line[-1][3][1], line_y_max])
-                        line_y.append([line_y_min, self.draw_line[0][2][1]])
-                    del self.x_border_line[result_total[0][1]]
-                    del self.x_border_line_y[result_total[0][1]]
-                    line_normal = self.x_border_line_normal.pop(result_total[0][1])
-                    self.x_border_line += [line_x, line_x]
-                    self.x_border_line_y += line_y[:]
-                    self.x_border_line_normal += [line_normal, line_normal]
-                else:
-                    # yが変わらない場合
-                    line_y = self.y_border_line[result_total[0][1]]
-                    line_x_min, line_x_max = self.y_border_line_x[result_total[0][1]]
-                    line_x = []
-                    if self.draw_line[0][1][0] == 1:
-                        line_x.append([self.draw_line[0][2][0], line_x_max])
-                        line_x.append([line_x_min, self.draw_line[-1][3][0]])
-                    else:
-                        line_x.append([self.draw_line[-1][3][0], line_x_max])
-                        line_x.append([line_x_min, self.draw_line[0][2][0]])
-                    del self.y_border_line[result_total[0][1]]
-                    del self.y_border_line_x[result_total[0][1]]
-                    line_normal = self.y_border_line_normal.pop(result_total[0][1])
-                    self.y_border_line += [line_y, line_y]
-                    self.y_border_line_x += line_x[:]
-                    self.y_border_line_normal += [line_normal, line_normal]
-            else:
-                print('違う')
-                if len(s_result) == 1:
-                    if s_result[0][0] == 0:
-                        line_x = self.x_border_line[s_result[0][1]]
-                        min_y, max_y = self.x_border_line_y[s_result[0][1]]
-                        if self.draw_line[0][1][1] == 1:
-                            line_y = [self.draw_line[0][2][1], max_y]
-                            end_position = [line_x, min_y]
-                        else:
-                            line_y = [min_y, self.draw_line[0][2][1]]
-                            end_position = [line_x, max_y]
-                        self.x_border_line_y[s_result[0][1]] = line_y
-                    else:
-                        line_y = self.y_border_line[s_result[0][1]]
-                        min_x, max_x = self.y_border_line_x[s_result[0][1]]
-                        if self.draw_line[0][1][0] == 1:
-                            line_x = [max_x, self.draw_line[0][2][0]]
-                            end_position = [min_x, line_y]
-                        else:
-                            line_x = [min_x, self.draw_line[0][2][0]]
-                            end_position = [max_x, line_y]
-                        self.y_border_line_x[s_result[0][1]] = line_x
-
-                if len(e_result) == 1:
-                    if e_result[0][0] == 0:
-                        line_x = self.x_border_line[e_result[0][1]]
-                        min_y, max_y = self.x_border_line_y[e_result[0][1]]
-                        if self.draw_line[-1][1][1] == 1:
-                            self.x_border_line_y[e_result[0][1]] = [self.draw_line[-1][3][1], max_y]
-                        else:
-                            self.x_border_line_y[e_result[0][1]] = [self.draw_line[-1][3][1], min_y]
-                    else:
-                        line_y = self.y_border_line[e_result[0][1]]
-                        min_x, max_x = self.y_border_line_x[e_result[0][1]]
-                        if self.draw_line[-1][1][0] == 1:
-                            self.y_border_line_x[e_result[0][1]] = [max_x, self.draw_line[-1][3][0]]
-                        else:
-                            self.y_border_line_x[e_result[0][1]] = [min_x, self.draw_line[-1][3][0]]
-
-            for normal, [nx,ny], [sx,sy], [ex,ey] in self.draw_line:
-                if normal == [0, 1] or normal == [0, -1]:
-                    self.x_border_line.append(sx)
-                    self.x_border_line_y.append([sy, ey] if sy < ey else [ey, sy])
-                    self.x_border_line_normal.append(nx)
-                    self.x_all_line.append(sx)
-                    self.x_all_line_y.append([sy, ey] if sy < ey else [ey, sy])
-                else:
-                    self.y_border_line.append(sy)
-                    self.y_border_line_x.append([sx, ex] if sx < ex else [ex, sx])
-                    self.y_border_line_normal.append(ny)
-                    self.y_all_line.append(sy)
-                    self.y_all_line_x.append([sx, ex] if sx < ex else [ex, sx])
-
             # 領域の塗りつぶしと割合の計算
-        """
 
 
     def Draw(self):
@@ -731,7 +654,7 @@ class App:
         pyxel.blt(self.pos[0] -2, self.pos[1] -2, 0, self.player_img, 0, self.player_x, self.player_y, 0)
 
         # 敵
-        pyxel.pix(self.enemy_position[0], self.enemy_position[1], 15)
+        pyxel.blt(self.enemy_position[0]-2, self.enemy_position[1]-2, 0, 0, 8, self.player_x, self.player_y, 0)
 
 if __name__=='__main__':
     App()
