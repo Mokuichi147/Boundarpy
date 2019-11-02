@@ -314,6 +314,8 @@ class Field:
                     pos = self.GetPosition(line, line_sub, result_line)
                     if position in pos:
                         pos.remove(position)
+                    if pos in log:
+                        continue
                     if self.GetNormal(line_normal, result_line) == self.CreateNormal(position, pos[0]):
                         next_position_list += pos
                     elif len(result_line) == 3:
