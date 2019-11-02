@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import copy
 import pyxel
 import pygame
 from pygame import locals
@@ -79,6 +80,26 @@ class Field:
         self.creation_line_direction = []
         self.creation = [[0, 0], [[0, 0], [0, 0]]]
     
+    def GetPosition(self, line, line_sub, line_info):
+        '''
+        return [min_pos, max_pos]
+        '''
+        num, index = line_info
+        if num == 0:
+            return [[line[num][index], line_sub[num][index][0]],  [line[num][index], line_sub[num][index][1]]]
+        else:
+            return [[line_sub[num][index][0], line[num][index]],  [line_sub[num][index][1], line[num][index]]]
+    
+    def GetNormal(self, line_normal, line_info):
+        '''
+        return [1, 0]
+        '''
+        num, index = line_info
+        if num == 0:
+            return [line_normal[num][index], 0]
+        else:
+            return [0, line_normal[num][index]]
+
     def JudgeLine(self, line, line_sub, position, line_normal=None, normal_scale=1):
         '''
         入力された座標に対して重なっている線の情報を返す
@@ -222,6 +243,8 @@ class Field:
             return [0, -1]
         elif direction == [0, -1]:
             return [1, 0]
+        else:
+            return [0, 0]
     
     def CreateNormal(self, begin_position, end_position):
         '''
@@ -233,14 +256,25 @@ class Field:
         ny = 0 if ny == 0 else 1 if ny > 0 else -1
         return [nx, ny]
     
-    def InversionNormal(self, normal):
+    def InversionNormalOne(self, normal):
         '''
         向きを反転させる
+        return [1, -1, 1, 1, ...]
         '''
         for num in range(2):
             if len(normal[num]) > 0:
                 for i in range(len(normal[num])):
                     normal[num][i] *= -1
+        return normal
+    
+    def InversionNormal(self, normal):
+        '''
+        向きを反転させる
+        return [[1,0], [-1,0], ...]
+        '''
+        for index in range(len(normal)):
+            normal[index][0] *= -1
+            normal[index][1] *= -1
         return normal
 
     def IsInLine(self, line, line_sub, line_info, end_position):
@@ -256,37 +290,57 @@ class Field:
                         result_list.append(position)
         return result_list
     
+    def NearestPosition(self, position, position_0, position_1):
+        p0 = abs(position_0[0] - position[0]) + abs(position_0[1] - position[1])
+        p1 = abs(position_1[0] - position[0]) + abs(position_1[1] - position[1])
+        if p0 <= p1:
+            return position_0
+        else:
+            return position_1
+
     def SearchPosition(self, line, line_sub, line_normal, begin_position, end_position, end_normal):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
         return 領域を囲う向きが正しいか(Bool: 正しい=True)
         '''
         position_list = [begin_position]
-        pre_lines = []
+        log = []
         while True:
+            log += copy.deepcopy(position_list)
+            next_position_list = []
             for position in position_list:
                 result_lines = self.JudgeLine(line, line_sub, position)
+                for result_line in result_lines:
+                    pos = self.GetPosition(line, line_sub, result_line)
+                    if position in pos:
+                        pos.remove(position)
+                    if self.GetNormal(line_normal, result_line) == self.CreateNormal(position, pos[0]):
+                        next_position_list += pos
+                    elif len(result_line) == 3:
+                        print('33333333333')
+                    else:
+                        next_position_list += pos
                 result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
                 if len(result_positions) > 0:
                     # 発見
-                    for e_pos in result_positions:
-                        nor = self.CreateNormal(position, e_pos)
-                        index = end_position.index(e_pos)
-                        if end_normal[index] == nor:
-                            return False
+                    print(log)
+                    if len(result_positions) == 2:
+                        e_pos = self.NearestPosition(position, result_positions[0], result_positions[1])
+                    else:
+                        e_pos = result_positions[0]
+                    nor = self.CreateNormal(position, e_pos)
+                    index = end_position.index(e_pos)
+                    if end_normal[index] == nor:
+                        return False
                     return True
+            if next_position_list == []:
+                print('seach position error')
+                import sys; sys.exit()
 
-            # 次の点を線から求める
-            next_position_list = []
-            for i in range(len(result_lines)):
-                xy = result_lines[i][0]
-                index = result_lines[i][1]
-                for j in range(2):
-                    position = [0, 0]
-                    position[xy] = line[xy][index]
-                    position[1-xy] = line_sub[xy][index][j]
-                    if not position in position_list:
-                        next_position_list.append(position[:])
+            # 次の点を求める
+            for pos in position_list:
+                if pos in next_position_list:
+                    next_position_list.remove(pos)
             position_list = next_position_list[:]
     
     def Search(self, enemy_position):
@@ -295,16 +349,25 @@ class Field:
         '''
         cross_result = self.JudgeLineCross(self.creation_line, self.creation_line_sub, self.creation_line_normal, self.border_line, self.border_line_sub, enemy_position)
         if cross_result[0]:
+            print('cross')
             if cross_result[1]:
-                self.creation_line_normal = self.InversionNormal(self.creation_line_normal)
+                print('normal')
+                self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
+                self.creation[1] = self.InversionNormal(self.creation[1])
             return
+        print('not cross',  cross_result[1])
 
         search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
         if not search_pos_result:
-            self.creation_line_normal = self.InversionNormal(self.creation_line_normal)
+            print('normal')
+            self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
+            self.creation[1] = self.InversionNormal(self.creation[1])
         return
 
     def CreationUpdate(self, controller, position, pre_position):
+        '''
+        memo: 引数以外に依存している
+        '''
         if controller == [0, 0]:
             return
         if len(self.creation_line_direction) != 0:
@@ -338,12 +401,95 @@ class Field:
         return
     
     def CreationClear(self):
-        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[1,0], [0,1], ...] creation:[[b_pos, e_pos], [b_normal, e_normal]]
+        '''
+        creation_line関係の変数を初期化する
+        '''
         self.creation_line = [[], []]
         self.creation_line_sub = [[], []]
         self.creation_line_normal = [[], []]
         self.creation_line_direction = []
         self.creation = [[0, 0], [[0, 0], [0, 0]]]
+    
+    def UpdateAllLine(self):
+        '''
+        memo: 引数以外に依存している
+        '''
+        for num in range(2):
+            self.all_line[num] += copy.deepcopy(self.creation_line[num])
+            self.all_line_sub[num] += copy.deepcopy(self.creation_line_sub[num][:])
+    
+    def AddBorderLine(self):
+        for num in range(2):
+            self.border_line[num] += copy.deepcopy(self.creation_line[num])
+            self.border_line_sub[num] += copy.deepcopy(self.creation_line_sub[num])
+            self.border_line_normal[num] += copy.deepcopy(self.creation_line_normal[num])
+        return
+    
+    def UpdateBorderLine(self):
+        '''
+        memo: 引数以外に依存している
+        '''
+        b_lines = self.JudgeLine(self.border_line, self.border_line_sub, self.creation[0][0])
+        e_lines = self.JudgeLine(self.border_line, self.border_line_sub, self.creation[0][1])
+        sum_line = [i for i in b_lines if i in e_lines]
+        if len(sum_line) > 0:
+            num, index = sum_line[0]
+            min_pos, max_pos = self.GetPosition(self.border_line, self.border_line_sub, sum_line[0])
+            if (self.creation[0][0] == min_pos and self.creation[0][1] == min_pos) or (self.creation[0][0] == max_pos and self.creation[0][1] == max_pos):
+                pass
+            elif (self.creation[0][0] == min_pos and self.creation[0][1] == max_pos) or (self.creation[0][0] == max_pos and self.creation[0][1] == min_pos):
+                del self.border_line[num][index]
+                del self.border_line_sub[num][index]
+                del self.border_line_normal[num][index]
+            elif self.creation[0][0] == min_pos or self.creation[0][0] == max_pos:
+                [_, pos], [_, normal] = self.creation
+                if self.CreateNormal(pos, min_pos) == normal:
+                    self.border_line_sub[num][index][1] = pos[normal[1]]
+                elif self.CreateNormal(pos, max_pos) == normal:
+                    self.border_line_sub[num][index][0] = pos[normal[1]]
+            elif self.creation[0][1] == min_pos or self.creation[0][1] == max_pos:
+                [pos, _], [normal, _] = self.creation
+                if self.CreateNormal(pos, min_pos) == normal:
+                    self.border_line_sub[num][index][1] = pos[normal[1]]
+                elif self.CreateNormal(pos, max_pos) == normal:
+                    self.border_line_sub[num][index][0] = pos[normal[1]]
+            else:
+                [b_pos, e_pos], [b_n, e_n] = self.creation
+                del self.border_line[num][index]
+                del self.border_line_sub[num][index]
+                normal = self.border_line_normal[num].pop(index)
+                if self.CreateNormal(b_pos, min_pos) == b_n:
+                    self.border_line[b_n[0]].append(self.creation[0][b_n[0]][b_n[0]])
+                    self.border_line_sub[b_n[0]].append([min_pos[b_n[1]], b_pos[b_n[1]]])
+                    self.border_line_normal[b_n[0]].append(normal)
+                    self.border_line[b_n[0]].append(self.creation[0][b_n[0]][b_n[0]])
+                    self.border_line_sub[b_n[0]].append([e_pos[b_n[1]], max_pos[b_n[1]]])
+                    self.border_line_normal[b_n[0]].append(normal)
+                else:
+                    self.border_line[b_n[0]].append(self.creation[0][b_n[0]][b_n[0]])
+                    self.border_line_sub[b_n[0]].append([min_pos[b_n[1]], e_pos[b_n[1]]])
+                    self.border_line_normal[b_n[0]].append(normal)
+                    self.border_line[b_n[0]].append(self.creation[0][b_n[0]][b_n[0]])
+                    self.border_line_sub[b_n[0]].append([b_pos[b_n[1]], max_pos[b_n[1]]])
+                    self.border_line_normal[b_n[0]].append(normal)
+            self.AddBorderLine()
+            return
+
+        for be in range(2):
+            lines = self.JudgeLine(self.border_line, self.border_line_sub, self.creation[0][be])
+            for line_info in lines:
+                num, index = line_info
+                for pos in self.GetPosition(self.border_line, self.border_line_sub, line_info):
+                    if self.CreateNormal(self.creation[0][be], pos) == self.creation[1][be]:
+                        if self.creation[1][be] == [1, 0]:
+                            self.border_line_sub[num][index][0] = self.creation[0][be][0]
+                        elif self.creation[1][be] == [0, 1]:
+                            self.border_line_sub[num][index][0] = self.creation[0][be][1]
+                        elif self.creation[1][be] == [-1, 0]:
+                            self.border_line_sub[num][index][1] = self.creation[0][be][0]
+                        elif self.creation[1][be] == [0, -1]:
+                            self.border_line_sub[num][index][1] = self.creation[0][be][1]
+        self.AddBorderLine()
 
 
 class App:
@@ -401,90 +547,6 @@ class App:
         pyxel.load('assets/main.pyxres')
         pyxel.run(self.Update, self.Draw)
 
-    def JudgeLine(self):
-        self.pre_on_line = self.on_line
-        self.on_line = False
-        for x_index in [i for i, x in enumerate(self.x_border_line) if x == self.x]:
-            if self.x_border_line_y[x_index][0] <= self.y <= self.x_border_line_y[x_index][1]:
-                self.on_line = True
-                self.pre_on_line_info = self.on_line_info
-                self.on_line_info = [0, x_index]
-        for y_index in [i for i, y in enumerate(self.y_border_line) if y == self.y]:
-            if self.y_border_line_x[y_index][0] <= self.x <= self.y_border_line_x[y_index][1]:
-                self.on_line = True
-                self.pre_on_line_info = self.on_line_info
-                self.on_line_info = [1, y_index]
-
-    def JudgeBorderLine(self, position):
-        result_list = []
-        for x_index in [i for i, x in enumerate(self.x_border_line) if x == position[0]]:
-            if self.x_border_line_y[x_index][0] <= position[1] <= self.x_border_line_y[x_index][1]:
-                result_list.append([0, x_index])
-        for y_index in [i for i, y in enumerate(self.y_border_line) if y == position[1]]:
-            if self.y_border_line_x[y_index][0] <= position[0] <= self.y_border_line_x[y_index][1]:
-                result_list.append([1, y_index])
-        # 0:縦 1:横
-        return result_list
-
-    def JudgeDrawLine(self, position, all_check=True, normal=False):
-        result_list = []
-        if all_check:
-            count_list = [i for i in range(len(self.draw_line))]
-        else:
-            count_list = [0, -1]
-
-        for i in count_list:
-            one, n, [sx,sy], [ex,ey] = self.draw_line[i]
-            min_x = sx if one != [-1, 0] else ex
-            max_x = ex if one != [-1, 0] else sx
-            min_y = sy if one != [0, -1] else ey
-            max_y = ey if one != [0, -1] else sy
-            if normal:
-                min_x += n[0]
-                max_x += n[0]
-                min_y += n[1]
-                max_y += n[1]
-            if min_x <= position[0] <= max_x and min_y <= position[1] <= max_y:
-                result_list.append(i)
-        return result_list
-
-    def TargetVector(self, start, goal, num=False):
-        wx = goal[0] - start[0]
-        wy = goal[1] - start[1]
-
-        if wx >= 0 and wy <= 0:
-            # 右上
-            weight = [1, 4, 2, 3] if wx > abs(wy) else [4, 1, 3, 2]
-        elif wx >= 0 and wy >= 0:
-            # 右下
-            weight = [1, 2, 4, 3] if wx > wy else [2, 1, 3, 4]
-        elif wx <= 0 and wy >= 0:
-            # 左下
-            weight = [3, 2, 4, 1] if abs(wx) > wy else [2, 3, 1, 4]
-        else:
-            # 左上
-            weight = [3, 4, 2, 1] if abs(wx) > abs(wy) else [4, 3, 1, 2]
-        if num:
-            return weight
-
-        result_list = []
-        for w in weight:
-            if w == 1:
-                result_list.append([1, 0])
-            elif w == 2:
-                result_list.append([0, 1])
-            elif w == 3:
-                result_list.append([-1, 0])
-            else:
-                result_list.append([0, -1])
-        return result_list
-
-    def ReDrawListNormal(self):
-        for i in range(len(self.draw_line)):
-            _, [nx, ny], _, _ = self.draw_line[i]
-            self.draw_line[i][1] = [nx * -1, ny * -1]
-
-
     def Update(self):
         self.controller.Update()
 
@@ -495,8 +557,9 @@ class App:
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.pos)
         #result = self.JudgeDrawLine([self.x, self.y])
         if len(result) > 0:
-            self.pos = self.pre_pos[:]
-            return
+            if self.field.creation[0][0] != self.pos:
+                self.pos = self.pre_pos[:]
+                return
 
         self.pre_on_line = self.on_line
         result = self.field.JudgeLine(self.field.border_line, self.field.border_line_sub, self.pos)
@@ -513,7 +576,7 @@ class App:
                 normal = [0, 0]
                 normal[num] = self.field.border_line_normal[num][index]
                 if normal == self.controller.stick:
-                    self.field.creation[0][0] = self.pos[:]
+                    self.field.creation[0][0] = self.pre_pos[:]
                     self.field.creation[1][0] = self.field.ConvertToNormal(self.controller.stick)
                     self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
                     return
@@ -525,68 +588,13 @@ class App:
             self.field.creation[1][1] = self.field.ConvertToNormal(self.controller.stick)
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
             self.field.Search(self.enemy_position)
+            self.field.UpdateAllLine()
+            self.field.UpdateBorderLine()
             self.field.CreationClear()
         elif not self.on_line and not self.pre_on_line:
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
 
         """
-        if self.on_line and not self.pre_on_line:
-            ''' 枠に入ってきたとき '''
-            self.draw_line[-1][3] = [self.x, self.y]
-            # 向きチェック
-            count = 0
-            min_count = 0
-            min_num = self.game_box[2] + self.game_box[3]
-            for _, _, _, [ex,ey] in self.draw_line:
-                if min_num > abs(self.enemy_position[0]-ex) + abs(self.enemy_position[1]-ey):
-                    min_num = abs(self.enemy_position[0]-ex) + abs(self.enemy_position[1]-ey)
-                    min_count = count
-                count += 1
-            one, n, [sx,sy], [ex,ey] = self.draw_line[min_count]
-
-            pos = self.enemy_position[:]
-            pre_pos = pos[:]
-            pos_info = []
-            pre_pos_info = []
-            goal = False
-            move = self.TargetVector(pos, [ex,ey])
-            draw_line_all_check = True
-            count = 0
-            while not goal:
-                count += 1
-                # posがdraw_line上か
-                result = self.JudgeDrawLine(pos, all_check=draw_line_all_check)
-                if len(result) > 0:
-                    # pre_posの位置確認
-                    pre_result = self.JudgeDrawLine(pre_pos, normal=True)
-                    print(self.draw_line)
-                    if len(pre_result) == 0:
-                        # normalを反転させる
-                        print('normalを反転させたよ')
-                        self.ReDrawListNormal()
-                    print('finish', count)
-                    print(self.draw_line)
-                    goal = True
-                    continue
-
-                # border_line上か
-                result = self.JudgeBorderLine(pos)
-                if len(result) > 0:
-                    pre_result = self.JudgeBorderLine(pre_pos)
-                    if len(pre_result) == 0 or len(result) > 1:
-                        draw_line_all_check = False
-                        # 進行方向を決める
-                        if len(result) > 1 and len(pre_result) > 0:
-                            result.remove(pre_result[0])
-                        move = self.TargetVector(pos, [ex,ey])
-                        if result[0][0] == 0 and move[0][1] == 0:
-                            move = [move[1], move[2]]
-                        elif result[0][0] == 1 and move[0][0] == 0:
-                            move = [move[1], move[2]]
-                # pos Update
-                pre_pos = pos[:]
-                pos = [pos[0] + move[0][0], pos[1] + move[0][1]]
-
             # 新しい枠の作成
             s_result = self.JudgeBorderLine(self.draw_line[0][2])
             e_result = self.JudgeBorderLine(self.draw_line[-1][3])
@@ -684,33 +692,6 @@ class App:
                     self.y_all_line_x.append([sx, ex] if sx < ex else [ex, sx])
 
             # 領域の塗りつぶしと割合の計算
-
-            self.draw_line.clear()
-        elif not self.on_line and self.pre_on_line:
-            ''' 枠から出たとき '''
-            # 枠の外側なら移動させない
-            if self.on_line_info[0] == 0:
-                if self.x_border_line[self.on_line_info[1]] + self.x_border_line_normal[self.on_line_info[1]] * self.move_scale != self.x:
-                    self.x = self.pre_x
-                    self.y = self.pre_y
-                    self.on_line = True
-                    return
-            else:
-                if self.y_border_line[self.on_line_info[1]] + self.y_border_line_normal[self.on_line_info[1]] * self.move_scale != self.y:
-                    self.x = self.pre_x
-                    self.y = self.pre_y
-                    self.on_line = True
-                    return
-            # 線を引くための情報を追加する
-            self.draw_line.append([self.controller.stick, self.field.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
-        
-        if self.on_line:
-            return
-        
-        if self.draw_line[-1][0] == self.controller.stick:
-            self.draw_line[-1][3] = [self.x, self.y]
-        elif self.controller.stick != [0, 0]:
-            self.draw_line.append([self.controller.stick, self.field.ConvertToNormal(self.controller.stick), [self.pre_x,self.pre_y], [self.x,self.y]])
         """
 
 
@@ -726,16 +707,16 @@ class App:
             pyxel.line(self.field.creation_line_sub[1][index][0], self.field.creation_line[1][index], self.field.creation_line_sub[1][index][1], self.field.creation_line[1][index], self.line_color_accent)
 
         # すべての線
-        for x_count in range(len(self.x_all_line)):
-            pyxel.line(self.x_all_line[x_count], self.x_all_line_y[x_count][0], self.x_all_line[x_count], self.x_all_line_y[x_count][1], self.line_color_no_accent)
-        for y_count in range(len(self.y_all_line)):
-            pyxel.line(self.y_all_line_x[y_count][0], self.y_all_line[y_count], self.y_all_line_x[y_count][1], self.y_all_line[y_count], self.line_color_no_accent)
+        for index in range(len(self.field.all_line[0])):
+            pyxel.line(self.field.all_line[0][index], self.field.all_line_sub[0][index][0], self.field.all_line[0][index], self.field.all_line_sub[0][index][1], self.line_color_no_accent)
+        for index in range(len(self.field.all_line[1])):
+            pyxel.line(self.field.all_line_sub[1][index][0], self.field.all_line[1][index], self.field.all_line_sub[1][index][1], self.field.all_line[1][index], self.line_color_no_accent)
 
         # 枠
-        for x_count in range(len(self.x_border_line)):
-            pyxel.line(self.x_border_line[x_count], self.x_border_line_y[x_count][0], self.x_border_line[x_count], self.x_border_line_y[x_count][1], self.line_color)
-        for y_count in range(len(self.y_border_line)):
-            pyxel.line(self.y_border_line_x[y_count][0], self.y_border_line[y_count], self.y_border_line_x[y_count][1], self.y_border_line[y_count], self.line_color)
+        for index in range(len(self.field.border_line[0])):
+            pyxel.line(self.field.border_line[0][index], self.field.border_line_sub[0][index][0], self.field.border_line[0][index], self.field.border_line_sub[0][index][1], self.line_color)
+        for index in range(len(self.field.border_line[1])):
+            pyxel.line(self.field.border_line_sub[1][index][0], self.field.border_line[1][index], self.field.border_line_sub[1][index][1], self.field.border_line[1][index], self.line_color)
 
         # ゲームの枠
         #pyxel.rectb(self.game_box[0], self.game_box[1], self.game_box[2] - self.game_box[0] + 1, self.game_box[3] - self.game_box[1] + 1, self.line_color)
