@@ -583,7 +583,7 @@ class App:
         
         if self.enemy_pre_position == self.enemy_position:
             self.game_count += 1
-            if self.game_count > 5:
+            if self.game_count > 30:
                 self.game = False
                 return
         else:
