@@ -579,7 +579,12 @@ class App:
             return
         
         if not self.game:
+            if pyxel.play_pos(0) != -1:
+                pyxel.stop(0)
             return
+        
+        if pyxel.play_pos(0) == -1:
+            pyxel.playm(0, loop=True)
         
         if self.enemy_pre_position == self.enemy_position:
             self.game_count += 1
@@ -656,6 +661,11 @@ class App:
         elif not self.on_line and not self.pre_on_line:
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
             # 領域の塗りつぶしと割合の計算
+        
+        if not self.on_line and self.pre_pos != self.pos:
+            pyxel.play(1, 1)
+        elif pyxel.play_pos(1) != -1:
+            pyxel.stop(1)
 
 
     def Draw(self):
