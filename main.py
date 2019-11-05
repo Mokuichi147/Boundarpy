@@ -2,7 +2,7 @@
 
 import copy
 from random import randint as ri
-from time import time
+from time import time, sleep
 import pyxel
 import pygame
 from pygame import locals
@@ -47,7 +47,10 @@ class Controller:
         for down in self.down_list:
             self.button_list.append(down)
         for up in self.up_list:
-            self.button_list.remove(up)
+            try:
+                self.button_list.remove(up)
+            except:
+                pass
 
         self.stick_rollover = [self.joystick_x, self.joystick_y]
         if self.stick_rollover == [0, 0]:
@@ -113,6 +116,8 @@ class Field:
                 for i in range(len(line[num])):
                     line[num][i] += line_normal[num][i] * normal_scale
         for num in range(2):
+            if len(line[num]) == 0:
+                continue
             for index in [c for c,l in enumerate(line[num]) if l == position[num]]:
                 line_min = line_sub[num][index][0]
                 line_max = line_sub[num][index][1]
@@ -308,7 +313,6 @@ class Field:
         position_list = [begin_position]
         log = []
         start_time = time()
-        print(start_time)
         while 2 > time() - start_time:
             log += copy.deepcopy(position_list)
             next_position_list = []
@@ -329,14 +333,14 @@ class Field:
                 result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
                 if len(result_positions) > 0:
                     # 発見
-                    print(time() - start_time)
+                    print(f'[   ,   ] {time() - start_time:.5f}')
                     if len(result_positions) == 2:
                         e_pos = self.NearestPosition(position, result_positions[0], result_positions[1])
                     else:
                         e_pos = result_positions[0]
                     nor = self.CreateNormal(position, e_pos)
                     index = end_position.index(e_pos)
-                    print(end_normal[index], nor)
+                    print('[   ,   ]', end_normal[index], nor)
                     if end_normal[index] == nor:
                         return False
                     line_infos = self.JudgeLine(line, line_sub, e_pos)
@@ -365,19 +369,19 @@ class Field:
         '''
         cross_result = self.JudgeLineCross(self.creation_line, self.creation_line_sub, self.creation_line_normal, self.border_line, self.border_line_sub, enemy_position)
         if cross_result[0]:
-            print('cross')
+            print('[   ,   ] cross')
             if cross_result[1]:
-                print('normal')
+                print('[   ,   ] normal')
                 self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
                 self.creation[1] = self.InversionNormal(self.creation[1])
             return
-        print('not cross',  cross_result[1])
+        print(f'[{cross_result[1][0]:>3},{cross_result[1][1]:>3}]not cross')
 
         search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
         if search_pos_result == None:
             return 'error'
         if not search_pos_result:
-            print('normal')
+            print('[   ,   ] normal')
             self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
             self.creation[1] = self.InversionNormal(self.creation[1])
         return
@@ -399,6 +403,12 @@ class Field:
                 elif controller == [0, -1]:
                     self.creation_line_sub[0][-1][0] = position[1]
                 return
+
+        if len(self.creation_line_direction) == 0:
+            print(f'[{pre_position[0]:>3},{pre_position[1]:>3}]draw begin {controller}')
+        else:
+            print(f'[{pre_position[0]:>3},{pre_position[1]:>3}] turn {controller}')
+
         self.creation_line_direction.append(controller[:])
         if controller == [1, 0]:
             self.creation_line[1].append(position[1])
@@ -520,6 +530,7 @@ class App:
         pyxel.run(self.Update, self.Draw)
     
     def Clear(self):
+        print('[===,===]GAME START')
         self.controller = Controller()
         self.field = Field(box_size=[10,30, 200,150], player_position=[10,30])
 
@@ -539,23 +550,6 @@ class App:
         self.enemy_size = 9
 
         self.game_box = (10,20, 200,150)
-
-        # 描画用の枠
-        self.x_all_line = [10, 200]
-        self.y_all_line = [20, 150]
-        self.x_all_line_y = [[20,150], [20,150]]
-        self.y_all_line_x = [[10,200], [10,200]]
-
-        # 移動できる枠
-        self.x_border_line = [10, 200]
-        self.y_border_line = [20, 150]
-        self.x_border_line_y = [[20,150], [20,150]]
-        self.y_border_line_x = [[10,200], [10,200]]
-        self.x_border_line_normal = [1, -1]
-        self.y_border_line_normal = [1, -1]
-
-        # [ [進行方向, [法線], [描き始めの位置], [現在の位置]], ...,  [進行方向, [法線], [描き始めの位置], [現在の位置]] ]
-        self.draw_line = []
 
         self.line_color = 13
         self.line_color_accent = 14
@@ -590,6 +584,7 @@ class App:
             self.game_count += 1
             if self.game_count > 30:
                 self.game = False
+                print('[###,###]CLEAR THE GAME')
                 return
         else:
             self.game_count = 0
@@ -609,15 +604,17 @@ class App:
             self.enemy_normal = [0, 0]
             start_time = time()
             while 2 > time() - start_time and (self.enemy_normal == [0, 0] or self.enemy_normal == self.enemy_pre_normal):
-                self.enemy_normal = [[-2, 0, 2][ri(-1,1)], [-2, 0, 2][ri(-1,1)]]
+                self.enemy_normal = [[-1*self.move_scale, 0, 1*self.move_scale][ri(-1,1)], [-1*self.move_scale, 0, 1*self.move_scale][ri(-1,1)]]
             if not 2 > time() - start_time:
                 self.game = False
                 self.game_message = 'GAMEOVER'
+                print('[###,###]GAMEOVER')
                 return
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.enemy_position)
         if len(result) > 0:
             self.game = False
             self.game_message = 'GAMEOVER'
+            print('[###,###]GAMEOVER')
             return
 
         result = self.field.JudgeLine(self.field.creation_line, self.field.creation_line_sub, self.pos)
@@ -648,12 +645,14 @@ class App:
             self.on_line = True
             return
         elif self.on_line and not self.pre_on_line:
+            print(f'[{self.pos[0]:>3},{self.pos[1]:>3}]draw end')
             self.field.creation[0][1] = self.pos[:]
             self.field.creation[1][1] = self.field.ConvertToNormal(self.controller.stick)
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
             if self.field.Search(self.enemy_position) == 'error':
                 self.game = False
                 self.game_message = 'GAMEOVER'
+                print('[###,###]GAMEOVER')
                 return
             self.field.UpdateAllLine()
             self.field.UpdateBorderLine()
