@@ -139,6 +139,9 @@ class Field:
         b_cross = self.NearestCross(border_cross, position)
 
         result = self.ComparsionCross(c_cross, b_cross)
+        if result == 'error':
+            import sys; sys.exit()
+
         if len(result) != 0:
             normal = result[0]
             pos = result[1]
@@ -190,6 +193,12 @@ class Field:
         '''
         return creation_lineのほうが近いか
         '''
+        for i in range(4):
+            if len(border_cross[i]) == 0:
+                print('[ error ]', 'cross border line not found')
+                print('[ error ]', border_cross)
+                return 'error'
+
         if len(creation_cross[0]) != 0:
             if creation_cross[0][0] <= border_cross[0][0]:
                 return [[1, 0], creation_cross[0]]
