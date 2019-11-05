@@ -152,8 +152,6 @@ class Field:
             return [True, False]
         return [False, b_cross[0]]
 
-
-    
     def NearestCross(self, cross, position):
         '''
         一番近い点だけにする
@@ -293,17 +291,17 @@ class Field:
             normal[index][1] *= -1
         return normal
 
-    def IsInLine(self, line, line_sub, line_info, end_position):
+    def IsInLine(self, line, line_sub, line_info, position_list):
         '''
         入力された線上に点があるかを返す
-        return [[end_position](点の位置), ...]
+        return [[position](点の位置), ...]
         '''
         result_list = []
-        for position in end_position:
+        for pos in position_list:
             for xy, index in line_info:
-                if line[xy][index] == position[xy]:
-                    if line_sub[xy][index][0] <= position[1-xy] <= line_sub[xy][index][1]:
-                        result_list.append(position)
+                if line[xy][index] == pos[xy]:
+                    if line_sub[xy][index][0] <= pos[1-xy] <= line_sub[xy][index][1]:
+                        result_list.append(pos)
         return result_list
     
     def NearestPosition(self, position, position_0, position_1):
@@ -313,6 +311,30 @@ class Field:
             return position_0
         else:
             return position_1
+    
+    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal):
+        '''
+        時計回りと反時計回りの２方向から調べる
+        return [反転させるかどうか, ([line_info, ...])]
+        '''
+        begin_result = self.JudgeLine(line, line_sub, begin_position)
+        for b_result in begin_result:
+            line_result = self.IsInLine(line, line_sub, b_result, end_position)
+            if len(line_result) > 0:
+                # 初めの線に目的地があった場合
+                return
+        
+        line_info_list = [copy.deepcopy(begin_result)]
+
+        if len(begin_result) == 1:
+            if begin_normal == [1, 0] or begin_normal == [0, -1]:
+                anticlockwise, clockwise = self.GetPosition(line, line_sub, begin_result[0])
+            else:
+                clockwise, anticlockwise = self.GetPosition(line, line_sub, begin_result[0])
+        elif len(begin_result) == 2:
+            pass
+        else:
+            return 'error'
 
     def SearchPosition(self, line, line_sub, line_normal, begin_position, end_position, end_normal):
         '''
@@ -332,16 +354,15 @@ class Field:
                     if position in pos:
                         pos.remove(position)
                     if pos in log:
-                        pass
+                        continue
                     if self.GetNormal(line_normal, result_line) == self.CreateNormal(position, pos[0]):
                         next_position_list += pos
-                    elif len(result_line) == 3:
-                        print('33333333333')
                     else:
                         next_position_list += pos
                 result_positions = self.IsInLine(line, line_sub, result_lines, end_position)
                 if len(result_positions) > 0:
                     # 発見
+                    print(log)
                     print(f'[   ,   ] {time() - start_time:.5f}')
                     if len(result_positions) == 2:
                         e_pos = self.NearestPosition(position, result_positions[0], result_positions[1])
@@ -361,7 +382,7 @@ class Field:
                                 return False
                     return True
             if next_position_list == []:
-                print('seach position error')
+                print('[ error ]seach position error')
                 import sys; sys.exit()
 
             # 次の点を求める
