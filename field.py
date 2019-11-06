@@ -259,6 +259,9 @@ class Field:
         return result_list
     
     def NearestPosition(self, position, position_0, position_1):
+        '''
+        近いほうの点を返す
+        '''
         p0 = abs(position_0[0] - position[0]) + abs(position_0[1] - position[1])
         p1 = abs(position_1[0] - position[0]) + abs(position_1[1] - position[1])
         if p0 <= p1:
