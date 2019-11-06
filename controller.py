@@ -1,19 +1,10 @@
 # coding: utf-8
 
-import pygame
-from pygame import locals
-
 class Controller:
-    def __init__(self):
-        pygame.init()
-        pygame.joystick.init()
-        if pygame.joystick.get_count() == 0:
-            print('controller not found')
-            self.keyboad = True
-        else:
-            self.keyboad = False
-            self.joystick = pygame.joystick.Joystick(0)
-            self.joystick.init()
+    def __init__(self, keybord=False):
+        self.keyboad = keybord
+        if not self.keyboad:
+            self.JoystickInit()
         
         self.joystick_x = 0
         self.joystick_y = 0
@@ -24,11 +15,20 @@ class Controller:
         self.down_list = []
         self.up_list   = []
         self.button_list = []
-
-    def Update(self):
-        self.down_list.clear()
-        self.up_list.clear()
-
+    
+    def JoystickInit(self):
+        import pygame
+        from pygame import locals
+        pygame.init()
+        if pygame.joystick.get_count() == 0:
+            print('controller not found')
+            self.keyboad = True
+        else:
+            self.keyboad = False
+            self.joystick = pygame.joystick.Joystick(0)
+            self.joystick.init()
+    
+    def GetJoystick(self):
         for event in pygame.event.get():
             if event.type == pygame.locals.JOYAXISMOTION:
                 self.joystick_x = self.joystick.get_axis(0)
@@ -39,6 +39,18 @@ class Controller:
                 self.down_list.append(event.button)
             else:
                 self.up_list.append(event.button)
+    
+    def GetKeybord(self):
+        pass
+
+    def Update(self):
+        self.down_list.clear()
+        self.up_list.clear()
+
+        if self.keyboad:
+            self.GetKeybord()
+        else:
+            self.GetJoystick()
         
         for down in self.down_list:
             self.button_list.append(down)
