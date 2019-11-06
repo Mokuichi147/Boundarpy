@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import copy
+from time import time
 
 class Field:
     def __init__(self, box_size=[10,30, 200,150], player_position=[10, 30]):

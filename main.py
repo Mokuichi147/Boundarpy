@@ -20,7 +20,7 @@ class App:
     
     def Clear(self):
         print('[===,===]GAME START')
-        self.controller = Controller()
+        self.controller = Controller(keybord=True)
         self.field = Field(box_size=[10,30, 200,150], player_position=[10,30])
 
         self.pos = [10, 30]
@@ -34,7 +34,7 @@ class App:
 
         self.enemy_position = [170, 40]
         self.enemy_pre_position = self.enemy_position[:]
-        self.enemy_normal = [[-2, 2][ri(0,1)], [-2, 2][ri(0,1)]]
+        self.enemy_normal = [[-1*self.move_scale, 1*self.move_scale][ri(0,1)], [-1*self.move_scale, 1*self.move_scale][ri(0,1)]]
         self.enemy_pre_normal = self.enemy_normal[:]
         self.enemy_size = 9
 

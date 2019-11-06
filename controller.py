@@ -1,5 +1,7 @@
 # coding: utf-8
 
+import pyxel
+
 class Controller:
     def __init__(self, keybord=False):
         self.keyboad = keybord
@@ -41,7 +43,21 @@ class Controller:
                 self.up_list.append(event.button)
     
     def GetKeybord(self):
-        pass
+        self.joystick_x = 0
+        self.joystick_y = 0
+        if pyxel.btn(pyxel.KEY_W):
+            self.joystick_y -= 1
+        if pyxel.btn(pyxel.KEY_A):
+            self.joystick_x -= 1
+        if pyxel.btn(pyxel.KEY_S):
+            self.joystick_y += 1
+        if pyxel.btn(pyxel.KEY_D):
+            self.joystick_x += 1
+
+        if pyxel.btnp(pyxel.KEY_SPACE):
+            self.up_list.append(9)
+        if pyxel.btnr(pyxel.KEY_SPACE):
+            self.down_list.append(9)
 
     def Update(self):
         self.down_list.clear()
