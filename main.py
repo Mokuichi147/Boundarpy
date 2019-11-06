@@ -14,7 +14,7 @@ class App:
         self.Clear()
 
         # MAX: 213x160
-        pyxel.init(210, 160, scale=2, fps=30)
+        pyxel.init(210, 160, caption='Boundarpy', scale=2, fps=30)
         pyxel.load('assets/main.pyxres')
         pyxel.run(self.Update, self.Draw)
     
@@ -164,12 +164,18 @@ class App:
             else:
                 pyxel.rect(70, 60, 78, 45, 1)
                 pyxel.text(80, 70, self.game_message, 10)
-            pyxel.text(85, 90, 'press START', 7)
+            if self.controller.keyboad:
+                pyxel.text(78, 90, 'press SPACE KEY', 7)
+            else:
+                pyxel.text(85, 90, 'press START', 7)
             return
 
         pyxel.cls(0)
 
-        pyxel.text(10, 10, 'RESTART: START Button', 7)
+        if self.controller.keyboad:
+            pyxel.text(10, 10, 'RESTART: SPACE KEY', 7)
+        else:
+            pyxel.text(10, 10, 'RESTART: START Button', 7)
 
         # 領域の描画
 
