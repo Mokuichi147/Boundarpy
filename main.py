@@ -151,6 +151,20 @@ class Field:
                     return [True, True]
             return [True, False]
         return [False, b_cross[0]]
+    
+    def JudgePosition(self, line, line_sub, position, line_normal=None, normal_scale=1):
+        '''
+        頂点と重なっている線の端の情報を返す
+        return [[normal, position, line_info]]
+        '''
+        result_list = []
+        line_info_list = self.JudgeLine(line, line_sub, position, line_normal, normal_scale)
+        for line_info in line_info_list:
+            min_pos, max_pos = self.GetPosition(line_info)
+            pos = min_pos[:] if position == max_pos else max_pos[:]
+            normal = self.CreateNormal(position, pos)
+            result_list.append([normal[:], pos[:], line_info[:]])
+        return result_list
 
     def NearestCross(self, cross, position):
         '''
