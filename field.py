@@ -63,7 +63,6 @@ class Field:
                 line_max = line_sub[num][index][1]
                 if line_min <= position[1-num] <= line_max:
                     result_list.append([num, index])
-        # [ [XorY, index], ... ]
         return result_list
 
     def JudgeLineCross(self, creation, creation_sub, creation_normal, border, border_sub, position):
@@ -288,14 +287,27 @@ class Field:
     def SearchClockwise(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, anti=False):
         '''
         時計回りと反時計回りの２方向から調べる
-        return [反転させるかどうか, [line_info, ...]]
+        return [領域を囲う向きが正しいか(Bool: 正しい=True), [line_info, ...]]
         '''
         normal = begin_normal
         position = begin_position
 
+        result_list = []
         start_time = time()
         while 2 < time() - start_time:
             direction_list, normal_list = self.CreateNormalClockwise(normal, anti=anti)
+            judge_line_result = self.JudgeLine(line, line_sub, position)
+            # ここが違うかも
+            for judge in judge_line_result:
+                min_pos, max_pos = self.GetPosition(line, line_sub, judge)
+                pos = max_pos if position == min_pos else min_pos
+                for i in range(3):
+                    if direction_list[i] == self.CreateNormal(position, pos):
+                        if normal_list[i] == self.GetNormal(line_normal, judge):
+                            position = pos[:]
+                            result_list.append(judge[:])
+                        else:
+                            return [False, result_list]
         return 'error'
 
     
