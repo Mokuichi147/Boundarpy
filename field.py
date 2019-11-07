@@ -269,9 +269,39 @@ class Field:
         else:
             return position_1
     
-    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal):
+    def CreateNormalClockwise(self, normal, anti=False):
+        '''
+        時計回り、反時計回りと内側の向きの情報から優先順位と正しい向きを返す
+        return [direction_list, normal_list]
+        '''
+        invertion = -1 if anti else 1
+
+        if normal == [1, 0]:
+            return [[[1,0], [0,-1*invertion], [-1,0]], [[0,1*invertion], [1,0], [0,-1*invertion]]]
+        elif normal == [0, 1]:
+            return [[[0,1], [1*invertion,0], [0,-1]], [[-1*invertion,0], [0,1], [1*invertion,0]]]
+        elif normal == [-1, 0]:
+            return [[[-1,0], [0,1*invertion], [1,0]], [[0,-1*invertion], [-1,0], [0,1*invertion]]]
+        elif normal == [0, -1]:
+            return [[[0,-1], [-1*invertion,0], [0,1]], [[1*invertion,0], [0,-1], [-1*invertion,0]]]
+    
+    def SearchClockwise(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, anti=False):
         '''
         時計回りと反時計回りの２方向から調べる
+        return [反転させるかどうか, [line_info, ...]]
+        '''
+        normal = begin_normal
+        position = begin_position
+
+        start_time = time()
+        while 2 < time() - start_time:
+            direction_list, normal_list = self.CreateNormalClockwise(normal, anti=anti)
+        return 'error'
+
+    
+    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal):
+        '''
+        入力された座標が線上を通ってゴール地点まで探索する
         return [反転させるかどうか, ([line_info, ...])]
         '''
         begin_result = self.JudgeLine(line, line_sub, begin_position)
@@ -288,6 +318,9 @@ class Field:
                 anticlockwise, clockwise = self.GetPosition(line, line_sub, begin_result[0])
             else:
                 clockwise, anticlockwise = self.GetPosition(line, line_sub, begin_result[0])
+            normal = self.GetNormal(line_normal, begin_result[0])
+            anticlockwise_result = self.SearchClockwise(line, line_sub, line_normal, anticlockwise, normal, end_position, end_normal, anti=True)
+            clockwise_result = self.SearchClockwise(line, line_sub, line_normal, clockwise, normal, end_position, end_normal)
         elif len(begin_result) == 2:
             pass
         else:
@@ -295,7 +328,7 @@ class Field:
 
     def SearchPosition(self, line, line_sub, line_normal, begin_position, end_position, end_normal):
         '''
-        入力された座標が線上を通ってゴール地点まで探索する
+        入力された座標が線上を通ってゴール地点まで探索する(旧)
         return 領域を囲う向きが正しいか(Bool: 正しい=True)
         '''
         position_list = [begin_position]
