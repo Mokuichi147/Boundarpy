@@ -291,23 +291,36 @@ class Field:
         '''
         normal = begin_normal
         position = begin_position
+        pre_position = position[:]
 
         result_list = []
         start_time = time()
         while 2 < time() - start_time:
             direction_list, normal_list = self.CreateNormalClockwise(normal, anti=anti)
             judge_line_result = self.JudgeLine(line, line_sub, position)
-            # ここが違うかも
+            judge_line_direction = []
             for judge in judge_line_result:
                 min_pos, max_pos = self.GetPosition(line, line_sub, judge)
                 pos = max_pos if position == min_pos else min_pos
-                for i in range(3):
-                    if direction_list[i] == self.CreateNormal(position, pos):
+                judge_line_direction.append(self.CreateNormal(position, pos))
+            for i in range(3):
+                for index in range(len(judge_line_direction)):
+                    if direction_list[i] == judge_line_direction[index]:
                         if normal_list[i] == self.GetNormal(line_normal, judge):
+                            pre_position = position[:]
                             position = pos[:]
-                            result_list.append(judge[:])
+                            result_list.append(judge_line_result[index][:])
                         else:
                             return [False, result_list]
+                        break
+            is_in_line = self.IsInLine(line, line_sub, result_list[-1], end_position)
+            if len(is_in_line) == 1:
+                # 領域判定
+                return
+            elif len(is_in_line) == 2:
+                nearest_pos = self.NearestPosition(position, is_in_line[0], is_in_line[1])
+                # 領域判定
+                return
         return 'error'
 
     
