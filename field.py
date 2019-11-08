@@ -318,7 +318,7 @@ class Field:
                 # 領域判定
                 return
             elif len(is_in_line) == 2:
-                nearest_pos = self.NearestPosition(position, is_in_line[0], is_in_line[1])
+                nearest_pos = self.NearestPosition(pre_position, is_in_line[0], is_in_line[1])
                 # 領域判定
                 return
         return 'error'
