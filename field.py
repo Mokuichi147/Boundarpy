@@ -337,10 +337,10 @@ class Field:
         return 'error'
 
     
-    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, end_direction):
+    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_direction, end_position, end_normal, end_direction):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
-        return [反転させるかどうか, ([line_info, ...])]
+        return [領域を囲う向きが正しいか(Bool: 正しい=True), [line_info, ...]]
         '''
         begin_result = self.JudgeLine(line, line_sub, begin_position)
         for b_result in begin_result:
@@ -352,7 +352,7 @@ class Field:
         line_info_list = [copy.deepcopy(begin_result)]
 
         if len(begin_result) == 1:
-            if begin_normal == [1, 0] or begin_normal == [0, -1]:
+            if begin_direction == [1, 0] or begin_direction == [0, -1]:
                 anticlockwise, clockwise = self.GetPosition(line, line_sub, begin_result[0])
             else:
                 clockwise, anticlockwise = self.GetPosition(line, line_sub, begin_result[0])
@@ -429,6 +429,7 @@ class Field:
         '''
         memo: 引数以外に依存している
         '''
+        # 敵に対して十字上にある線を調べる
         cross_result = self.JudgeLineCross(self.creation_line, self.creation_line_sub, self.creation_line_normal, self.border_line, self.border_line_sub, enemy_position)
         if cross_result[0]:
             print('[   ,   ] cross')
@@ -439,7 +440,27 @@ class Field:
             return
         print(f'[{cross_result[1][0]:>3},{cross_result[1][1]:>3}]not cross')
 
-        self.SearchPositionOnLine(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], )
+        # 境界線を伝って調べる
+        search_result = self.SearchPositionOnLine(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], [1, 0], self.creation[0], self.creation[1], self.creation[2])
+        '''
+        if search_result[0] == 'error':
+            return 'error'
+        invertion, line_infos = search_result
+        if invertion:
+            self.creation_line_normal = self.InversionNormalOne(self.creation_line_normal)
+            self.creation[1] = self.InversionNormal(self.creation[1])
+        border_line = [[], []]
+        border_line_sub = [[], []]
+        border_line_normal = [[], []]
+        for num, index in line_infos:
+            border_line[num].append(self.border_line[num][index])
+            border_line_sub[num].append(self.border_line_sub[num][index][:])
+            border_line_normal[num].append(self.border_line_normal[num][index])
+        self.border_line = border_line[:]
+        self.border_line_sub = border_line_sub[:]
+        self.border_line_normal = border_line_normal[:]
+        '''
+        
         search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
         if search_pos_result == None:
             return 'error'
