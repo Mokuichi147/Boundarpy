@@ -128,6 +128,7 @@ class App:
                 if normal == self.controller.stick:
                     self.field.creation[0][0] = self.pre_pos[:]
                     self.field.creation[1][0] = self.field.ConvertToNormal(self.controller.stick)
+                    self.field.creation[2][0] = self.pos[:]
                     self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
                     return
             self.pos = self.pre_pos[:]
@@ -137,6 +138,7 @@ class App:
             print(f'[{self.pos[0]:>3},{self.pos[1]:>3}]draw end')
             self.field.creation[0][1] = self.pos[:]
             self.field.creation[1][1] = self.field.ConvertToNormal(self.controller.stick)
+            self.field.creation[2][1] = self.pre_pos[:]
             self.field.CreationUpdate(self.controller.stick, self.pos, self.pre_pos)
             if self.field.Search(self.enemy_position) == 'error':
                 self.game = False

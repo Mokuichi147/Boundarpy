@@ -18,12 +18,13 @@ class Field:
         self.border_line_sub = [[self.box[1::2],self.box[1::2]], [self.box[::2],self.box[::2]]]
         self.border_line_normal = [[1, -1], [1, -1]]
 
-        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[1,0], [0,1], ...] creation:[[b_pos, e_pos], [b_normal, e_normal]]
+        # 作成用: main:[[x],[y]] sub:[[x_y],[y_x]] normal:[[x_n],[y_n]]  direction:[[1,0], [0,1], ...]
         self.creation_line = [[], []]
         self.creation_line_sub = [[], []]
         self.creation_line_normal = [[], []]
         self.creation_line_direction = []
-        self.creation = [[0, 0], [[0, 0], [0, 0]]]
+        # creation:[[b_pos, e_pos], [b_normal, e_normal], [b_direction, e_direction]]
+        self.creation = [[0, 0], [[0, 0], [0, 0]], [[0, 0], [0, 0]]]
     
     def GetPosition(self, line, line_sub, line_info):
         '''
@@ -198,18 +199,19 @@ class Field:
         return result_list
 
     
-    def ConvertToNormal(self, direction):
+    def ConvertToNormal(self, direction, invertion=False):
         '''
         進行方向から右向きのNormalを返す
         '''
+        inv = -1 if invertion else 1
         if direction == [1, 0]:
-            return [0, 1]
+            return [0, 1*inv]
         elif direction == [0, 1]:
-            return [-1, 0]
+            return [-1*inv, 0]
         elif direction == [-1, 0]:
-            return [0, -1]
+            return [0, -1*inv]
         elif direction == [0, -1]:
-            return [1, 0]
+            return [1*inv, 0]
         else:
             return [0, 0]
     
@@ -284,7 +286,7 @@ class Field:
         elif normal == [0, -1]:
             return [[[0,-1], [-1*invertion,0], [0,1]], [[1*invertion,0], [0,-1], [-1*invertion,0]]]
     
-    def SearchClockwise(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, anti=False):
+    def SearchClockwise(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, end_direction, anti=False):
         '''
         時計回りと反時計回りの２方向から調べる
         return [領域を囲う向きが正しいか(Bool: 正しい=True), [line_info, ...]]
@@ -305,26 +307,37 @@ class Field:
                 judge_line_direction.append(self.CreateNormal(position, pos))
             for i in range(3):
                 for index in range(len(judge_line_direction)):
-                    if direction_list[i] == judge_line_direction[index]:
-                        if normal_list[i] == self.GetNormal(line_normal, judge):
-                            pre_position = position[:]
-                            position = pos[:]
-                            result_list.append(judge_line_result[index][:])
-                        else:
-                            return [False, result_list]
-                        break
+                    if direction_list[i] != judge_line_direction[index]:
+                        continue
+                    if normal_list[i] == self.GetNormal(line_normal, judge):
+                        pre_position = position[:]
+                        position = pos[:]
+                        normal = normal_list[i][:]
+                        result_list.append(judge_line_result[index][:])
+                    else:
+                        return 'error'
+                    break
             is_in_line = self.IsInLine(line, line_sub, result_list[-1], end_position)
-            if len(is_in_line) == 1:
-                # 領域判定
-                return
-            elif len(is_in_line) == 2:
-                nearest_pos = self.NearestPosition(pre_position, is_in_line[0], is_in_line[1])
-                # 領域判定
-                return
+            if len(is_in_line) == 0:
+                continue
+            end_pos = is_in_line[0] if len(is_in_line) == 1 else self.NearestPosition(pre_position, is_in_line[0], is_in_line[1])
+            end_index = end_position.index(end_pos)
+            end_nor = end_normal[end_index]
+            pre_end_pos = end_direction[end_index]
+            end_dir = self.CreateNormal(end_pos, pre_end_pos)
+            if normal == end_dir:
+                if self.ConvertToNormal(normal, invertion=anti) == end_nor:
+                    return [True, result_list]
+                else:
+                    return [False, result_list]
+            elif normal == end_nor:
+                return [True, result_list]
+            else:
+                return [False, result_list]
         return 'error'
 
     
-    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal):
+    def SearchPositionOnLine(self, line, line_sub, line_normal, begin_position, begin_normal, end_position, end_normal, end_direction):
         '''
         入力された座標が線上を通ってゴール地点まで探索する
         return [反転させるかどうか, ([line_info, ...])]
@@ -344,8 +357,12 @@ class Field:
             else:
                 clockwise, anticlockwise = self.GetPosition(line, line_sub, begin_result[0])
             normal = self.GetNormal(line_normal, begin_result[0])
-            anticlockwise_result = self.SearchClockwise(line, line_sub, line_normal, anticlockwise, normal, end_position, end_normal, anti=True)
-            clockwise_result = self.SearchClockwise(line, line_sub, line_normal, clockwise, normal, end_position, end_normal)
+            anticlockwise_result = self.SearchClockwise(line, line_sub, line_normal, anticlockwise, normal, end_position, end_normal, end_direction, anti=True)
+            clockwise_result = self.SearchClockwise(line, line_sub, line_normal, clockwise, normal, end_position, end_normal, end_direction)
+            if anticlockwise_result[0] != clockwise_result[0]:
+                return 'error'
+            if not anticlockwise_result[0]:
+                print('new normal')
         elif len(begin_result) == 2:
             pass
         else:
@@ -422,6 +439,7 @@ class Field:
             return
         print(f'[{cross_result[1][0]:>3},{cross_result[1][1]:>3}]not cross')
 
+        self.SearchPositionOnLine(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], )
         search_pos_result = self.SearchPosition(self.border_line, self.border_line_sub, self.border_line_normal, cross_result[1], self.creation[0], self.creation[1])
         if search_pos_result == None:
             return 'error'
@@ -481,7 +499,7 @@ class Field:
         self.creation_line_sub = [[], []]
         self.creation_line_normal = [[], []]
         self.creation_line_direction = []
-        self.creation = [[0, 0], [[0, 0], [0, 0]]]
+        self.creation = [[0, 0], [[0, 0], [0, 0]], [[0, 0], [0, 0]]]
     
     def UpdateAllLine(self):
         '''
